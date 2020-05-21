@@ -35,9 +35,8 @@ let rec read i =
 (***********************************************************)
 
 type node =
-    Node_Int of int
-    | Node_Add of node * node
-    | Node_Sub of node * node
+    | Node_Int of int
+    | Node_Calc of operation * node * node
 
 let num = function
     (Degit d) :: tokens -> (Node_Int d, tokens)
@@ -47,25 +46,14 @@ let num = function
 expr = num ("+" num | "-" num)*
 *)
 
-let rec add left tokens =
-    let read_op = function
-        Operator op -> Some op
-        | _ -> None in
-    let node_add left right = function
-        Plus -> Node_Add (left, right)
-        | Minus -> Node_Sub (left, right) in
-    let maybe_add left = function
-        [] -> None
-        | head :: tokens -> let op = read_op head in match op with
-            Some op ->
-                let (right, tokens) = num tokens in
-                let node = node_add left right op in
-                Some (node, tokens)
-            | None -> None in
-    let maybe = maybe_add left tokens in
-    match maybe with
-    Some (node, tokens) -> add node tokens
-    | None -> (left, tokens)
+let rec add left = function
+        | [] -> (left, [])
+        | head :: tail -> match head with
+            | Operator op ->
+                let (right, tail) = num tail in
+                let node = Node_Calc (op, left, right) in
+                add node tail
+            | _ -> (left, head :: tail)
 
 let parse tokens =
     let (left, tokens) = num tokens in
@@ -75,15 +63,13 @@ let parse tokens =
 let ast = parse (read 1)
 
 let rec p = function
-    | Node_Int d ->
-        printf " %d" d
-    | Node_Add (left, right) ->
+    | Node_Int d -> printf " %d" d
+    | Node_Calc (op, left, right) ->
         p left;
-        printf " +";
-        p right
-    | Node_Sub (left, right) ->
-        p left;
-        printf " -";
+        begin match op with
+        | Plus -> printf " +"
+        | Minus -> printf " -"
+        end;
         p right
 
 let () =
