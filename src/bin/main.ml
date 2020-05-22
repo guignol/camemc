@@ -25,15 +25,9 @@ let rec starts_with_any_of_list str = function
 
 let numbers = ['1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9'; '0']
 
-let starts_with_number str = starts_with_any_of_list str numbers
+let is_number ch = List.exists (fun c -> c = ch) numbers
 
-let tokenize = function
-        | "+" -> Operator Plus
-        | "-" -> Operator Minus
-        | "*" -> Operator Mul
-        | "/" -> Operator Div
-        | input when starts_with_number input -> Number (int_of_string input)
-        | _ as input -> Identifier input
+let starts_with_number str = starts_with_any_of_list str numbers
 
 let debug_print_token = function
     | Number d -> printf "# int: %d\n" d
@@ -47,11 +41,39 @@ let debug_print_token = function
         end
     | Identifier s -> printf "# identifier: %s\n" s
 
-let count = Array.length Sys.argv - 1
+(* cf. string.ml *)
+let is_space = function
+  | ' ' | '\012' | '\n' | '\r' | '\t' -> true
+  | _ -> false
 
-let rec read i =
-    if count < i then []
-    else tokenize Sys.argv.(i) :: read (i + 1)
+let tokenize reader =
+    let rec read_input cursor tokens =
+        match reader cursor with None -> tokens | Some ch ->
+        (* スペース *)
+        if is_space ch then read_input (cursor + 1) tokens else
+        (* 四則演算 *)
+        let read_operation op = read_input (cursor + 1) (tokens @ [Operator op]) in
+        match ch with
+            | '+' -> read_operation Plus
+            | '-' -> read_operation Minus
+            | '*' -> read_operation Mul
+            | '/' -> read_operation Div
+            | _ ->
+        (* 数値 *)
+        let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
+        let rec to_number offset str = match reader (cursor + offset) with
+            | None -> (offset, str)
+            | Some ch ->
+                if is_number ch
+                then to_number (offset + 1) (str ^ String.make 1 ch)
+                else (offset, str)
+        in
+        if is_number ch
+        then let (offset, number) = to_number 1 (String.make 1 ch) in read_number offset (int_of_string number) else
+        (* その他 *)
+        read_input (cursor + 1) (tokens @ [Identifier (String.make 1 ch)])
+    in
+    read_input 0 []
 
 (*let () = List.iter debug_print_token (read 1)*)
 
@@ -107,12 +129,6 @@ let add tokens =
             | _ -> (left, head :: tail) in
     add_inner left tokens
 
-let parse tokens =
-    let (node, _) = add tokens in
-    node
-
-let ast = parse (read 1)
-
 let rec debug_print_ast = function
     | Node_Int d -> printf " %d" d
     | Node_Calc (op, left, right) ->
@@ -124,6 +140,17 @@ let rec debug_print_ast = function
         | Div -> printf " /"
         end;
         debug_print_ast right
+
+let parse tokens =
+    let (node, _) = add tokens in
+    let () =
+        printf "#";
+        debug_print_ast node;
+        print_endline ""
+    in
+    node
+
+(***********************************************************)
 
 let rec emit = function
     | Node_Int d -> printf "  push %d\n" d
@@ -148,9 +175,10 @@ let rec emit = function
         print_string   "  push rax\n"
 
 let () =
-    printf "#";
-    debug_print_ast ast;
-    print_endline "";
+    let input = Sys.argv.(1) in
+    let reader index = try Some input.[index] with _ -> None in
+    let tokens = tokenize reader in
+    let ast = parse tokens in
     print_endline  ".intel_syntax noprefix";
     print_endline  ".text";
     print_endline  ".global main";
