@@ -38,7 +38,7 @@ type node =
     | Node_Int of int
     | Node_Calc of operation * node * node
 
-let num = function
+let expect_int = function
     (Degit d) :: tokens -> (Node_Int d, tokens)
     | _ -> failwith "this is not int"
 
@@ -50,13 +50,13 @@ let rec add left = function
         | [] -> (left, [])
         | head :: tail -> match head with
             | Operator op ->
-                let (right, tail) = num tail in
+                let (right, tail) = expect_int tail in
                 let node = Node_Calc (op, left, right) in
                 add node tail
             | _ -> (left, head :: tail)
 
 let parse tokens =
-    let (left, tokens) = num tokens in
+    let (left, tokens) = expect_int tokens in
     let (node, _) = add left tokens in
     node
 
@@ -72,6 +72,19 @@ let rec p = function
         end;
         p right
 
+let rec emit = function
+    | Node_Int d -> printf "  push %d\n" d
+    | Node_Calc (op, left, right) ->
+        emit left;
+        emit right;
+        print_string   "  pop rdi\n";
+        print_string   "  pop rax\n";
+        begin match op with
+        | Plus -> print_string   "  add rax, rdi\n";
+        | Minus -> print_string   "  sub rax, rdi\n";
+        end;
+        print_string   "  push rax\n"
+
 let () =
     printf "#";
     p ast;
@@ -80,10 +93,12 @@ let () =
     print_endline  ".text";
     print_endline  ".global main";
     print_endline  "main:";
+    (* プロローグ *)
     print_endline  "  push rbp";
     print_endline  "  mov rbp, rsp";
-    printf         "  mov rax, %i\n" count;
+    emit ast;
     print_endline  ".Lreturn.main:";
+    (* エピローグ *)
     print_endline  "  mov rsp, rbp";
     print_endline  "  pop rbp";
     print_endline  "  ret";
