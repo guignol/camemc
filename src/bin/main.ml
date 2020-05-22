@@ -2,22 +2,39 @@
 (*let () = print_endline "Bye!"*)
 
 open Printf
+open String
+
+(* MEMO *)
+(* https://stackoverflow.com/questions/43554262/how-to-validate-if-a-string-only-contains-number-chars-in-ocaml *)
+(* https://stackoverflow.com/questions/9863036/ocaml-function-parameter-pattern-matching-for-strings *)
 
 type operation = Plus | Minus
 
 type token =
-    Degit of int
+    | Number of int
     | Operator of operation
     | Identifier of string
 
+let starts_with str ch = match index_opt str ch with
+    | Some index -> index = 0
+    | None -> false
+
+let numbers = ['1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9'; '0']
+
+let rec starts_with_any_of_list str = function
+    | [] -> false
+    | head :: tail -> starts_with str head || starts_with_any_of_list str tail
+
+let starts_with_number str = starts_with_any_of_list str numbers
+
 let tokenize = function
-        ("1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9"|"0") as input -> Degit (int_of_string input)
-        |"+" -> Operator Plus
-        |"-" -> Operator Minus
+        | "+" -> Operator Plus
+        | "-" -> Operator Minus
+        | input when starts_with_number input -> Number (int_of_string input)
         | _ as input -> Identifier input
 
 let print_token = function
-    Degit d -> printf "# int: %i\n" d
+    Number d -> printf "# int: %d\n" d
     | Operator op ->
         (match op with
             Plus -> printf "# operator: %s\n" "+"
@@ -39,7 +56,7 @@ type node =
     | Node_Calc of operation * node * node
 
 let expect_int = function
-    (Degit d) :: tokens -> (Node_Int d, tokens)
+    (Number d) :: tokens -> (Node_Int d, tokens)
     | _ -> failwith "this is not int"
 
 (*
