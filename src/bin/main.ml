@@ -35,7 +35,7 @@ let tokenize = function
         | input when starts_with_number input -> Number (int_of_string input)
         | _ as input -> Identifier input
 
-let print_token = function
+let debug_print_token = function
     | Number d -> printf "# int: %d\n" d
     | Operator op ->
         begin
@@ -53,7 +53,7 @@ let rec read i =
     if count < i then []
     else tokenize Sys.argv.(i) :: read (i + 1)
 
-(*let () = List.iter print_token (read 1)*)
+(*let () = List.iter debug_print_token (read 1)*)
 
 (***********************************************************)
 
@@ -113,17 +113,17 @@ let parse tokens =
 
 let ast = parse (read 1)
 
-let rec p = function
+let rec debug_print_ast = function
     | Node_Int d -> printf " %d" d
     | Node_Calc (op, left, right) ->
-        p left;
+        debug_print_ast left;
         begin match op with
         | Plus -> printf " +"
         | Minus -> printf " -"
         | Mul -> printf " *"
         | Div -> printf " /"
         end;
-        p right
+        debug_print_ast right
 
 let rec emit = function
     | Node_Int d -> printf "  push %d\n" d
@@ -149,7 +149,7 @@ let rec emit = function
 
 let () =
     printf "#";
-    p ast;
+    debug_print_ast ast;
     print_endline "";
     print_endline  ".intel_syntax noprefix";
     print_endline  ".text";
