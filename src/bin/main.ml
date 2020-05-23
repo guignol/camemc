@@ -12,13 +12,22 @@ let starts_with str ch = match index_opt str ch with
     | Some index -> index = 0
     | None -> false
 
-let is_number = function '0' .. '9' -> true | _ -> false
+let degit_of_char = function
+    | '0' -> Some 0
+    | '1' -> Some 1
+    | '2' -> Some 2
+    | '3' -> Some 3
+    | '4' -> Some 4
+    | '5' -> Some 5
+    | '6' -> Some 6
+    | '7' -> Some 7
+    | '8' -> Some 8
+    | '9' -> Some 9
+    | _ -> None
 let is_alpha = function 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
-let is_alnum ch = is_alpha ch || is_number ch
+let is_alnum ch = is_alpha ch || (degit_of_char ch) != None
 (* cf. string.ml *)
-let is_space = function
-  | ' ' | '\012' | '\n' | '\r' | '\t' -> true
-  | _ -> false
+let is_space = function ' ' | '\012' | '\n' | '\r' | '\t' -> true | _ -> false
 
 type token =
   | Number of int
@@ -53,15 +62,14 @@ let tokenize reader =
         match ch with '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved 1 (String.make 1 ch) | _ ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
-        let rec to_number offset str = match reader (cursor + offset) with
-            | None -> (offset, str)
-            | Some ch ->
-                if is_number ch
-                then to_number (offset + 1) (str ^ String.make 1 ch)
-                else (offset, str)
+        let rec concat_number offset number = match reader (cursor + offset) with
+            | None -> (offset, number)
+            | Some ch ->match degit_of_char ch with
+                | None -> (offset, number)
+                | Some n -> concat_number (offset + 1) (number * 10 + n)
         in
-        if is_number ch
-        then let (offset, number) = to_number 1 (String.make 1 ch) in read_number offset (int_of_string number) else
+        let (offset, number) = concat_number 0 0 in
+        if 0 < offset then read_number offset number else
         (* その他 *)
         read_input (cursor + 1) (tokens @ [Identifier (String.make 1 ch)])
     in
@@ -84,7 +92,7 @@ let from_token = function
     | "/" -> Div
     | "==" -> Equal
     | "!=" -> Not_Equal
-    | _ -> failwith "the operation is not supported"
+    | op -> failwith (sprintf "this operation[%s] is not supported" op)
 
 type node =
     | Node_Int of int
@@ -94,7 +102,7 @@ let expect_int = function
     (Number d) :: tokens -> (Node_Int d, tokens)
     | _ -> failwith "this is not int"
 
-let expect condition ~next = match condition with
+let expect ~next = function
     | None -> failwith "something's lost"
     | Some s -> next (s)
 
@@ -108,9 +116,9 @@ let parse_binary_operator tokens next operators =
     let (left, tokens) = next tokens in
     let rec recursive left tokens =
         let binary_node op tokens =
-           let (right, tokens) = next tokens in
-           let node = Node_Binary (op, left, right) in
-           recursive node tokens in
+            let (right, tokens) = next tokens in
+            let node = Node_Binary (op, left, right) in
+            recursive node tokens in
         let rec consume_operator = function
             | [] -> (left, tokens)
             | op_str :: operators ->
@@ -132,7 +140,7 @@ unary      = ("+" | "-")? primary
 primary    = num | "(" expr ")"
 *)
 
-let rec expr tokens = equality tokens
+let rec expr tokens =   equality tokens
 and equality tokens =   parse_binary_operator tokens relational ["=="; "!="]
 and relational tokens = parse_binary_operator tokens add        ["<"; "<="; ">"; ">="]
 and add tokens =        parse_binary_operator tokens mul        ["+"; "-"]
@@ -142,7 +150,7 @@ and unary tokens =
     match consume "-" tokens with
         | Some tokens ->
             let (right, tokens) = next tokens in
-            (* -m = 0 - n *)
+            (* -n = 0 - n *)
             let node = Node_Binary (Minus, Node_Int 0, right) in
             (node, tokens)
         | None ->
