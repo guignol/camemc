@@ -8,10 +8,8 @@ open String
 (* https://stackoverflow.com/questions/43554262/how-to-validate-if-a-string-only-contains-number-chars-in-ocaml *)
 (* https://stackoverflow.com/questions/9863036/ocaml-function-parameter-pattern-matching-for-strings *)
 
-type operation = Plus | Minus | Mul | Div
 type token =
     | Number of int
-    | Operator of operation
     | Reserved of string
     | Identifier of string
 
@@ -40,15 +38,9 @@ let tokenize reader =
         (* スペース *)
         if is_space ch then read_input (cursor + 1) tokens else
         (* 記号 *)
-        let read_operation op = read_input (cursor + 1) (tokens @ [Operator op]) in
         let read_reserved r = read_input (cursor + 1) (tokens @ [Reserved r]) in
         match ch with
-            | '+' -> read_operation Plus
-            | '-' -> read_operation Minus
-            | '*' -> read_operation Mul
-            | '/' -> read_operation Div
-            | '(' -> read_reserved "("
-            | ')' -> read_reserved ")"
+            | '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved (String.make 1 ch)
             | _ ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
@@ -68,14 +60,6 @@ let tokenize reader =
 
 let debug_print_token = function
     | Number d -> printf "# int: %d\n" d
-    | Operator op ->
-        begin
-        match op with
-            | Plus -> printf "# operator: %s\n" "+"
-            | Minus -> printf "# operator: %s\n" "-"
-            | Mul -> printf "# operator: %s\n" "*"
-            | Div -> printf "# operator: %s\n" "/"
-        end
     | Reserved r -> printf "# %s\n" r
     | Identifier s -> printf "# identifier: %s\n" s
 
@@ -83,9 +67,11 @@ let debug_print_token = function
 
 (***********************************************************)
 
+type operation = Plus | Minus | Mul | Div | EQUAL
+
 type node =
     | Node_Int of int
-    | Node_Calc of operation * node * node
+    | Node_Binary of operation * node * node
 
 let expect_int = function
     (Number d) :: tokens -> (Node_Int d, tokens)
@@ -101,85 +87,85 @@ let consume str = function
         | Reserved r when r = str -> Some tail
         | _ -> None
 
-let consume_op operation = function
-    | [] -> None
-    | head :: tail -> match head with
-        | Operator op when op = operation -> Some tail
-        | _ -> None
-
 (*
-expr    = add
-add     = mul ("+" mul | "-" mul)*
-mul     = unary ("*" unary | "/" unary)*
-unary   = ("+" | "-")? primary
-primary = num | "(" expr ")"
+expr       = equality
+equality   = relational ("==" relational | "!=" relational)*
+relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+add        = mul ("+" mul | "-" mul)*
+mul        = unary ("*" unary | "/" unary)*
+unary      = ("+" | "-")? primary
+primary    = num | "(" expr ")"
 *)
 
-let rec primary tokens = match consume "(" tokens with
+let rec expr tokens = add tokens
+
+(*and expr tokens = equality tokens*)
+
+(*and equality tokens =*)
+(*    let (left, tokens) = relational tokens in*)
+(*    let rec equality_inner left = function*)
+(*        | [] -> (left, [])*)
+(*        | _ -> match consume "==" tokens with*)
+(*            | Some tokens ->*)
+(*                    let (right, tokens) = relational tokens in*)
+(*                    let node = Node_Binary (op, left, right) in*)
+(*            | None ->*)
+
+(*and relational tokens = add tokens*)
+
+and add tokens =
+    let next tokens = mul tokens in
+    let (left, tokens) = next tokens in
+    let rec recursive left tokens =
+       let binary_node op tokens =
+           let (right, tokens) = next tokens in
+           let node = Node_Binary (op, left, right) in
+           recursive node tokens in
+       match consume "+" tokens with
+           | Some tokens -> binary_node Plus tokens
+           | None ->
+       match consume "-" tokens with
+           | Some tokens -> binary_node Minus tokens
+           | None -> (left, tokens)
+    in
+    recursive left tokens
+
+and mul tokens =
+    let next tokens = unary tokens in
+    let (left, tokens) = next tokens in
+    let rec recursive left tokens =
+        let binary_node op tokens =
+            let (right, tokens) = next tokens in
+            let node = Node_Binary (op, left, right) in
+            recursive node tokens in
+        match consume "*" tokens with
+            | Some tokens -> binary_node Mul tokens
+            | None ->
+        match consume "/" tokens with
+            | Some tokens -> binary_node Div tokens
+            | None -> (left, tokens)
+    in
+    recursive left tokens
+
+and unary tokens =
+    let next tokens = primary tokens in
+    match consume "-" tokens with
+        | Some tokens ->
+            let (right, tokens) = next tokens in
+            (* -m = 0 - n *)
+            let node = Node_Binary (Minus, Node_Int 0, right) in
+            (node, tokens)
+        | None ->
+    match consume "+" tokens with
+        | Some tokens -> next tokens
+        | None -> next tokens
+
+and primary tokens = match consume "(" tokens with
     | None -> expect_int tokens
     | Some tokens ->
         let (node, tokens) = expr tokens in
-        let consumed = consume ")" tokens in
         let continue tokens = (node, tokens) in
-        expect consumed ~next:continue
-
-and unary tokens =
-    match consume_op Minus tokens with
-        | Some tokens ->
-            let (right, tokens) = primary tokens in
-            let node = Node_Calc (Minus, Node_Int 0, right) in
-            (node, tokens)
-        | None ->
-    match consume_op Plus tokens with
-        | Some tokens -> primary tokens
-        | None -> primary tokens
-
-and mul tokens =
-    let (left, tokens) = unary tokens in
-    let rec mul_inner left = function
-        | [] -> (left, [])
-        | head :: tail -> match head with
-            | Operator op ->
-                begin match op with
-                | Mul | Div ->
-                    let (right, tail) = unary tail in
-                    let node = Node_Calc (op, left, right) in
-                    mul_inner node tail
-                | _ -> (left, head :: tail)
-                end
-            | _ -> (left, head :: tail) in
-    mul_inner left tokens
-
-and add tokens =
-    let (left, tokens) = mul tokens in
-    let rec add_inner left = function
-        | [] -> (left, [])
-        | head :: tail -> match head with
-            | Operator op ->
-                begin match op with
-                | Plus | Minus ->
-                    let (right, tail) = mul tail in
-                    let node = Node_Calc (op, left, right) in
-                    add_inner node tail
-                | _ -> (left, head :: tail)
-                end
-            | _ -> (left, head :: tail) in
-    add_inner left tokens
-
-and expr tokens = add tokens
-
-(* 優先順位およびカッコを無視してる *)
-let rec debug_print_ast = function
-    | Node_Int d -> printf " %d" d
-    | Node_Calc (op, left, right) ->
-        debug_print_ast left;
-        begin match op with
-        | Plus -> printf " +"
-        | Minus -> printf " -"
-        | Mul -> printf " *"
-        | Div -> printf " /"
-        end;
-        debug_print_ast right
+        expect (consume ")" tokens) ~next:continue
 
 let parse tokens =
     let (nodes, _) = expr tokens in
@@ -194,7 +180,7 @@ let parse tokens =
 
 let rec emit = function
     | Node_Int d -> printf "  push %d\n" d
-    | Node_Calc (op, left, right) ->
+    | Node_Binary (op, left, right) ->
         emit left;
         emit right;
         print_string   "  pop rdi\n";
@@ -203,14 +189,18 @@ let rec emit = function
         | Plus -> print_string   "  add rax, rdi\n";
         | Minus -> print_string   "  sub rax, rdi\n";
         | Mul -> print_string   "  imul rax, rdi\n";
-        (*
-        cqo命令を使うと、RAXに入っている64ビットの値を128ビットに伸ばしてRDXとRAXにセットする
-        idivは暗黙のうちにRDXとRAXを取って、それを合わせたものを128ビット整数とみなして、
-        それを引数のレジスタの64ビットの値で割り、商をRAXに、余りをRDXにセットする
-        *)
         | Div ->
+            (*
+            cqo命令を使うと、RAXに入っている64ビットの値を128ビットに伸ばしてRDXとRAXにセットする
+            idivは暗黙のうちにRDXとRAXを取って、それを合わせたものを128ビット整数とみなして、
+            それを引数のレジスタの64ビットの値で割り、商をRAXに、余りをRDXにセットする
+            *)
             print_string   "  cqo\n";
             print_string   "  idiv rdi\n";
+        | EQUAL ->
+            (* TODO *)
+            print_string   "  \n";
+            print_string   "  \n";
         end;
         print_string   "  push rax\n"
 
