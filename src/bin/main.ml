@@ -9,10 +9,10 @@ open String
 (* https://stackoverflow.com/questions/9863036/ocaml-function-parameter-pattern-matching-for-strings *)
 
 type operation = Plus | Minus | Mul | Div
-
 type token =
     | Number of int
     | Operator of operation
+    | Reserved of string
     | Identifier of string
 
 let starts_with str ch = match index_opt str ch with
@@ -29,18 +29,6 @@ let is_number ch = List.exists (fun c -> c = ch) numbers
 
 let starts_with_number str = starts_with_any_of_list str numbers
 
-let debug_print_token = function
-    | Number d -> printf "# int: %d\n" d
-    | Operator op ->
-        begin
-        match op with
-            | Plus -> printf "# operator: %s\n" "+"
-            | Minus -> printf "# operator: %s\n" "-"
-            | Mul -> printf "# operator: %s\n" "*"
-            | Div -> printf "# operator: %s\n" "/"
-        end
-    | Identifier s -> printf "# identifier: %s\n" s
-
 (* cf. string.ml *)
 let is_space = function
   | ' ' | '\012' | '\n' | '\r' | '\t' -> true
@@ -51,13 +39,16 @@ let tokenize reader =
         match reader cursor with None -> tokens | Some ch ->
         (* スペース *)
         if is_space ch then read_input (cursor + 1) tokens else
-        (* 四則演算 *)
+        (* 記号 *)
         let read_operation op = read_input (cursor + 1) (tokens @ [Operator op]) in
+        let read_reserved r = read_input (cursor + 1) (tokens @ [Reserved r]) in
         match ch with
             | '+' -> read_operation Plus
             | '-' -> read_operation Minus
             | '*' -> read_operation Mul
             | '/' -> read_operation Div
+            | '(' -> read_reserved "("
+            | ')' -> read_reserved ")"
             | _ ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
@@ -74,6 +65,19 @@ let tokenize reader =
         read_input (cursor + 1) (tokens @ [Identifier (String.make 1 ch)])
     in
     read_input 0 []
+
+let debug_print_token = function
+    | Number d -> printf "# int: %d\n" d
+    | Operator op ->
+        begin
+        match op with
+            | Plus -> printf "# operator: %s\n" "+"
+            | Minus -> printf "# operator: %s\n" "-"
+            | Mul -> printf "# operator: %s\n" "*"
+            | Div -> printf "# operator: %s\n" "/"
+        end
+    | Reserved r -> printf "# %s\n" r
+    | Identifier s -> printf "# identifier: %s\n" s
 
 (*let () = List.iter debug_print_token (read 1)*)
 
@@ -94,7 +98,7 @@ let expect condition ~next = match condition with
 let consume str = function
     | [] -> None
     | head :: tail -> match head with
-        | Identifier i when i = str -> Some tail
+        | Reserved r when r = str -> Some tail
         | _ -> None
 
 let consume_op operation = function
