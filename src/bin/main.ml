@@ -91,36 +91,54 @@ let expect condition ~next = match condition with
     | None -> failwith "something's lost"
     | Some s -> next (s)
 
-let consume_str str = function
+let consume str = function
     | [] -> None
     | head :: tail -> match head with
         | Identifier i when i = str -> Some tail
         | _ -> None
 
+let consume_op operation = function
+    | [] -> None
+    | head :: tail -> match head with
+        | Operator op when op = operation -> Some tail
+        | _ -> None
+
 (*
 expr    = add
 add     = mul ("+" mul | "-" mul)*
-mul     = primary ("*" primary | "/" primary)*
+mul     = unary ("*" unary | "/" unary)*
+unary   = ("+" | "-")? primary
 primary = num | "(" expr ")"
 *)
 
-let rec primary tokens = match consume_str "(" tokens with
+let rec primary tokens = match consume "(" tokens with
     | None -> expect_int tokens
     | Some tokens ->
         let (node, tokens) = expr tokens in
-        let consumed = consume_str ")" tokens in
+        let consumed = consume ")" tokens in
         let continue tokens = (node, tokens) in
         expect consumed ~next:continue
 
+and unary tokens =
+    match consume_op Minus tokens with
+        | Some tokens ->
+            let (right, tokens) = primary tokens in
+            let node = Node_Calc (Minus, Node_Int 0, right) in
+            (node, tokens)
+        | None ->
+    match consume_op Plus tokens with
+        | Some tokens -> primary tokens
+        | None -> primary tokens
+
 and mul tokens =
-    let (left, tokens) = primary tokens in
+    let (left, tokens) = unary tokens in
     let rec mul_inner left = function
         | [] -> (left, [])
         | head :: tail -> match head with
             | Operator op ->
                 begin match op with
                 | Mul | Div ->
-                    let (right, tail) = primary tail in
+                    let (right, tail) = unary tail in
                     let node = Node_Calc (op, left, right) in
                     mul_inner node tail
                 | _ -> (left, head :: tail)
@@ -161,11 +179,11 @@ let rec debug_print_ast = function
 
 let parse tokens =
     let (nodes, _) = expr tokens in
-    let () =
-        printf "#";
+(*    let () =*)
+(*        printf "#";*)
 (*        debug_print_ast nodes;*)
-        print_endline ""
-    in
+(*        print_endline ""*)
+(*    in*)
     nodes
 
 (***********************************************************)
