@@ -87,25 +87,40 @@ let expect_int = function
     (Number d) :: tokens -> (Node_Int d, tokens)
     | _ -> failwith "this is not int"
 
+let expect condition ~next = match condition with
+    | None -> failwith "something's lost"
+    | Some s -> next (s)
+
+let consume_str str = function
+    | [] -> None
+    | head :: tail -> match head with
+        | Identifier i when i = str -> Some tail
+        | _ -> None
+
 (*
 expr    = add
 add     = mul ("+" mul | "-" mul)*
 mul     = primary ("*" primary | "/" primary)*
-primary = num
-↑まずこれ
-↓あとで
 primary = num | "(" expr ")"
 *)
 
-let mul tokens =
-    let (left, tokens) = expect_int tokens in
+let rec primary tokens = match consume_str "(" tokens with
+    | None -> expect_int tokens
+    | Some tokens ->
+        let (node, tokens) = expr tokens in
+        let consumed = consume_str ")" tokens in
+        let continue tokens = (node, tokens) in
+        expect consumed ~next:continue
+
+and mul tokens =
+    let (left, tokens) = primary tokens in
     let rec mul_inner left = function
         | [] -> (left, [])
         | head :: tail -> match head with
             | Operator op ->
                 begin match op with
                 | Mul | Div ->
-                    let (right, tail) = expect_int tail in
+                    let (right, tail) = primary tail in
                     let node = Node_Calc (op, left, right) in
                     mul_inner node tail
                 | _ -> (left, head :: tail)
@@ -113,7 +128,7 @@ let mul tokens =
             | _ -> (left, head :: tail) in
     mul_inner left tokens
 
-let add tokens =
+and add tokens =
     let (left, tokens) = mul tokens in
     let rec add_inner left = function
         | [] -> (left, [])
@@ -129,6 +144,9 @@ let add tokens =
             | _ -> (left, head :: tail) in
     add_inner left tokens
 
+and expr tokens = add tokens
+
+(* 優先順位およびカッコを無視してる *)
 let rec debug_print_ast = function
     | Node_Int d -> printf " %d" d
     | Node_Calc (op, left, right) ->
@@ -142,13 +160,13 @@ let rec debug_print_ast = function
         debug_print_ast right
 
 let parse tokens =
-    let (node, _) = add tokens in
+    let (nodes, _) = expr tokens in
     let () =
         printf "#";
-        debug_print_ast node;
+(*        debug_print_ast nodes;*)
         print_endline ""
     in
-    node
+    nodes
 
 (***********************************************************)
 
