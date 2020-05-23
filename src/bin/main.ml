@@ -17,15 +17,11 @@ let starts_with str ch = match index_opt str ch with
     | Some index -> index = 0
     | None -> false
 
-let rec starts_with_any_of_list str = function
-    | [] -> false
-    | head :: tail -> starts_with str head || starts_with_any_of_list str tail
+let is_number = function '0' .. '9' -> true | _ -> false
 
-let numbers = ['1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9'; '0']
+let is_alpha = function 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
 
-let is_number ch = List.exists (fun c -> c = ch) numbers
-
-let starts_with_number str = starts_with_any_of_list str numbers
+let is_alnum ch = is_alpha ch || is_number ch
 
 (* cf. string.ml *)
 let is_space = function
@@ -34,13 +30,31 @@ let is_space = function
 
 let tokenize reader =
     let rec read_input cursor tokens =
+        let equals ch str =
+            let length = String.length str in
+            if length = 0 then 0 else
+            let rec check offset buffer =
+                match reader (cursor + offset) with
+                    | None -> 0
+                    | Some ch ->
+                        if length = offset then
+                            (* まだ文字が続いている場合は一致しない *)
+                            let continues = is_alnum ch in
+                            if str = buffer && not continues then offset else 0
+                        else check (offset + 1) (buffer ^ String.make 1 ch)
+            in
+            check 1 (String.make 1 ch)
+        in
         match reader cursor with None -> tokens | Some ch ->
         (* スペース *)
         if is_space ch then read_input (cursor + 1) tokens else
-        (* 記号 *)
-        let read_reserved r = read_input (cursor + 1) (tokens @ [Reserved r]) in
+        (* 2文字以上の記号 *)
+        let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
+        let offset = equals ch "==" in
+        if 0 < offset then read_reserved offset "==" else
+        (* 1文字の記号 *)
         match ch with
-            | '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved (String.make 1 ch)
+            | '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved 1 (String.make 1 ch)
             | _ ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
@@ -97,10 +111,9 @@ unary      = ("+" | "-")? primary
 primary    = num | "(" expr ")"
 *)
 
-let rec expr tokens = add tokens
+let rec expr tokens = equality tokens
 
-(*and expr tokens = equality tokens*)
-
+and equality tokens = add tokens
 (*and equality tokens =*)
 (*    let (left, tokens) = relational tokens in*)
 (*    let rec equality_inner left = function*)
