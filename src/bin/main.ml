@@ -25,7 +25,7 @@ let degit_of_char = function
     | '9' -> Some 9
     | _ -> None
 let is_alpha = function 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
-let is_alnum ch = is_alpha ch || (degit_of_char ch) != None
+let is_alnum ch = is_alpha ch || (degit_of_char ch) <> None
 (* cf. string.ml *)
 let is_space = function ' ' | '\012' | '\n' | '\r' | '\t' -> true | _ -> false
 
@@ -85,7 +85,7 @@ let debug_print_token = function
 (***********************************************************)
 
 type operation = Plus | Minus | Mul | Div | Equal | Not_Equal
-let from_token = function
+let operation_of_string = function
     | "+" -> Plus
     | "-" -> Minus
     | "*" -> Mul
@@ -115,16 +115,15 @@ let consume str = function
 let parse_binary_operator tokens next operators =
     let (left, tokens) = next tokens in
     let rec recursive left tokens =
-        let binary_node op tokens =
-            let (right, tokens) = next tokens in
-            let node = Node_Binary (op, left, right) in
-            recursive node tokens in
         let rec consume_operator = function
             | [] -> (left, tokens)
-            | op_str :: operators ->
-                match consume op_str tokens with
-                    | Some tokens -> binary_node (from_token op_str) tokens
-                    | None -> consume_operator operators
+            | op_str :: operators -> match consume op_str tokens with
+                | Some tokens ->
+                    let (right, tokens) = next tokens in
+                    let op = operation_of_string op_str in
+                    let node = Node_Binary (op, left, right) in
+                    recursive node tokens
+                | None -> consume_operator operators
         in
         consume_operator operators
     in
@@ -147,15 +146,13 @@ and add tokens =        parse_binary_operator tokens mul        ["+"; "-"]
 and mul tokens =        parse_binary_operator tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
+    match consume "+" tokens with Some tokens -> next tokens | None ->
     match consume "-" tokens with
         | Some tokens ->
             let (right, tokens) = next tokens in
             (* -n = 0 - n *)
             let node = Node_Binary (Minus, Node_Int 0, right) in
             (node, tokens)
-        | None ->
-    match consume "+" tokens with
-        | Some tokens -> next tokens
         | None -> next tokens
 
 and primary tokens = match consume "(" tokens with
