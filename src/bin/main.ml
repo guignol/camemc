@@ -8,39 +8,36 @@ open String
 (* https://stackoverflow.com/questions/43554262/how-to-validate-if-a-string-only-contains-number-chars-in-ocaml *)
 (* https://stackoverflow.com/questions/9863036/ocaml-function-parameter-pattern-matching-for-strings *)
 
-type token =
-    | Number of int
-    | Reserved of string
-    | Identifier of string
-
 let starts_with str ch = match index_opt str ch with
     | Some index -> index = 0
     | None -> false
 
 let is_number = function '0' .. '9' -> true | _ -> false
-
 let is_alpha = function 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
-
 let is_alnum ch = is_alpha ch || is_number ch
-
 (* cf. string.ml *)
 let is_space = function
   | ' ' | '\012' | '\n' | '\r' | '\t' -> true
   | _ -> false
 
+type token =
+  | Number of int
+  | Reserved of string
+  | Identifier of string
+
 let tokenize reader =
     let rec read_input cursor tokens =
         let equals ch str =
             let length = String.length str in
-            if length = 0 then 0 else
+            if length = 0 then None else
             let rec check offset buffer =
                 match reader (cursor + offset) with
-                    | None -> 0
+                    | None -> None
                     | Some ch ->
                         if length = offset then
                             (* まだ文字が続いている場合は一致しない *)
                             let continues = is_alnum ch in
-                            if str = buffer && not continues then offset else 0
+                            if str = buffer && not continues then Some (offset, str) else None
                         else check (offset + 1) (buffer ^ String.make 1 ch)
             in
             check 1 (String.make 1 ch)
@@ -50,12 +47,10 @@ let tokenize reader =
         if is_space ch then read_input (cursor + 1) tokens else
         (* 2文字以上の記号 *)
         let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
-        let offset = equals ch "==" in
-        if 0 < offset then read_reserved offset "==" else
+        let found = List.find_map (equals ch) ["=="; "!="] in
+        match found with Some (offset, target) -> read_reserved offset target | None ->
         (* 1文字の記号 *)
-        match ch with
-            | '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved 1 (String.make 1 ch)
-            | _ ->
+        match ch with '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved 1 (String.make 1 ch) | _ ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
         let rec to_number offset str = match reader (cursor + offset) with
