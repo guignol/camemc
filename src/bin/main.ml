@@ -76,7 +76,7 @@ let debug_print_token = function
 
 (***********************************************************)
 
-type operation = Plus | Minus | Mul | Div | EQUAL
+type operation = Plus | Minus | Mul | Div | Equal | Not_Equal
 
 type node =
     | Node_Int of int
@@ -108,16 +108,22 @@ primary    = num | "(" expr ")"
 
 let rec expr tokens = equality tokens
 
-and equality tokens = add tokens
-(*and equality tokens =*)
-(*    let (left, tokens) = relational tokens in*)
-(*    let rec equality_inner left = function*)
-(*        | [] -> (left, [])*)
-(*        | _ -> match consume "==" tokens with*)
-(*            | Some tokens ->*)
-(*                    let (right, tokens) = relational tokens in*)
-(*                    let node = Node_Binary (op, left, right) in*)
-(*            | None ->*)
+and equality tokens =
+    let next tokens = add tokens in
+    let (left, tokens) = next tokens in
+    let rec recursive left tokens =
+       let binary_node op tokens =
+           let (right, tokens) = next tokens in
+           let node = Node_Binary (op, left, right) in
+           recursive node tokens in
+       match consume "==" tokens with
+           | Some tokens -> binary_node Equal tokens
+           | None ->
+       match consume "!=" tokens with
+           | Some tokens -> binary_node Not_Equal tokens
+           | None -> (left, tokens)
+    in
+    recursive left tokens
 
 (*and relational tokens = add tokens*)
 
@@ -205,10 +211,14 @@ let rec emit = function
             *)
             print_string   "  cqo\n";
             print_string   "  idiv rdi\n";
-        | EQUAL ->
-            (* TODO *)
-            print_string   "  \n";
-            print_string   "  \n";
+        | Equal ->
+            print_string   "  cmp rax, rdi\n";
+            print_string   "  sete al\n";
+            print_string   "  movzb rax, al\n";
+        | Not_Equal ->
+            print_string   "  cmp rax, rdi\n";
+            print_string   "  setne al\n";
+            print_string   "  movzb rax, al\n";
         end;
         print_string   "  push rax\n"
 
