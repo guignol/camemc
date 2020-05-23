@@ -77,6 +77,14 @@ let debug_print_token = function
 (***********************************************************)
 
 type operation = Plus | Minus | Mul | Div | Equal | Not_Equal
+let from_token = function
+    | "+" -> Plus
+    | "-" -> Minus
+    | "*" -> Mul
+    | "/" -> Div
+    | "==" -> Equal
+    | "!=" -> Not_Equal
+    | _ -> failwith "the operation is not supported"
 
 type node =
     | Node_Int of int
@@ -96,6 +104,24 @@ let consume str = function
         | Reserved r when r = str -> Some tail
         | _ -> None
 
+let parse_binary_operator tokens next operators =
+    let (left, tokens) = next tokens in
+    let rec recursive left tokens =
+        let binary_node op tokens =
+           let (right, tokens) = next tokens in
+           let node = Node_Binary (op, left, right) in
+           recursive node tokens in
+        let rec consume_operator = function
+            | [] -> (left, tokens)
+            | op_str :: operators ->
+                match consume op_str tokens with
+                    | Some tokens -> binary_node (from_token op_str) tokens
+                    | None -> consume_operator operators
+        in
+        consume_operator operators
+    in
+    recursive left tokens
+
 (*
 expr       = equality
 equality   = relational ("==" relational | "!=" relational)*
@@ -107,60 +133,10 @@ primary    = num | "(" expr ")"
 *)
 
 let rec expr tokens = equality tokens
-
-and equality tokens =
-    let next tokens = add tokens in
-    let (left, tokens) = next tokens in
-    let rec recursive left tokens =
-       let binary_node op tokens =
-           let (right, tokens) = next tokens in
-           let node = Node_Binary (op, left, right) in
-           recursive node tokens in
-       match consume "==" tokens with
-           | Some tokens -> binary_node Equal tokens
-           | None ->
-       match consume "!=" tokens with
-           | Some tokens -> binary_node Not_Equal tokens
-           | None -> (left, tokens)
-    in
-    recursive left tokens
-
-(*and relational tokens = add tokens*)
-
-and add tokens =
-    let next tokens = mul tokens in
-    let (left, tokens) = next tokens in
-    let rec recursive left tokens =
-       let binary_node op tokens =
-           let (right, tokens) = next tokens in
-           let node = Node_Binary (op, left, right) in
-           recursive node tokens in
-       match consume "+" tokens with
-           | Some tokens -> binary_node Plus tokens
-           | None ->
-       match consume "-" tokens with
-           | Some tokens -> binary_node Minus tokens
-           | None -> (left, tokens)
-    in
-    recursive left tokens
-
-and mul tokens =
-    let next tokens = unary tokens in
-    let (left, tokens) = next tokens in
-    let rec recursive left tokens =
-        let binary_node op tokens =
-            let (right, tokens) = next tokens in
-            let node = Node_Binary (op, left, right) in
-            recursive node tokens in
-        match consume "*" tokens with
-            | Some tokens -> binary_node Mul tokens
-            | None ->
-        match consume "/" tokens with
-            | Some tokens -> binary_node Div tokens
-            | None -> (left, tokens)
-    in
-    recursive left tokens
-
+and equality tokens =   parse_binary_operator tokens relational ["=="; "!="]
+and relational tokens = parse_binary_operator tokens add        ["<"; "<="; ">"; ">="]
+and add tokens =        parse_binary_operator tokens mul        ["+"; "-"]
+and mul tokens =        parse_binary_operator tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
     match consume "-" tokens with
