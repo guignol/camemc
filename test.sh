@@ -20,10 +20,12 @@ assert() {
 		echo "[$actual] $input"
 	else
 		echo "[$expected expected, but got $actual] $input"
+		echo errrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrror
 		exit 1
 	fi
 }
 
+try 5 '1 + 2 + 3 + 4; 5;'
 try 10 '1 + 2 + 3 + 4;'
 try 10 '-1 + 2 + (14 - 3) - 1 * 2;'
 

@@ -178,11 +178,21 @@ and primary tokens = match consume "(" tokens with
         (node, Option.get (consume ")" tokens))
 
 let parse tokens =
-    let (nodes, tokens) = stmt tokens in
-    let () =
-        if 0 < List.length tokens then
-            (* 消費されなかったトークンがあれば出力される *)
-            printf "# [remains] "; List.iter print_token tokens; print_endline "";
+    let rec program nodes = function
+        | [] -> (nodes, [])
+        | tokens ->
+            let (new_root_node, tokens) = stmt tokens in
+            let nodes = nodes @ [new_root_node] in
+            program nodes tokens
+    in
+    let (nodes, tokens) = program [] tokens in
+    let () = if 0 < List.length tokens then
+        (* 消費されなかったトークンがあれば出力される *)
+        begin
+        printf "# [remains] ";
+        List.iter print_token tokens;
+        print_endline ""
+        end
     in
     nodes
 
@@ -249,7 +259,7 @@ let () =
     let input = Sys.argv.(1) in
     let reader index = try Some input.[index] with _ -> None in
     let tokens = tokenize reader in
-    let ast = parse tokens in
+    let trees = parse tokens in
     print_endline  ".intel_syntax noprefix";
     print_endline  ".text";
     print_endline  ".global main";
@@ -257,7 +267,7 @@ let () =
     (* プロローグ *)
     print_endline  "  push rbp";
     print_endline  "  mov rbp, rsp";
-    emit ast;
+    List.iter emit trees;
     print_endline  ".Lreturn.main:";
     (* エピローグ *)
     print_endline  "  mov rsp, rbp";
