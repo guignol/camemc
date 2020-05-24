@@ -37,6 +37,9 @@ type token =
 let tokenize reader =
     let rec read_input cursor tokens =
         let equals ch str =
+            (* Keywordの場合、まだ文字が続いている場合は一致しない *)
+            (*  let tail_check ch = is_alnum ch in*)
+            let tail_check _ = false in
             let length = String.length str in
             if length = 0 then None else
             let rec check offset buffer =
@@ -44,8 +47,7 @@ let tokenize reader =
                     | None -> None
                     | Some ch ->
                         if length = offset then
-                            (* まだ文字が続いている場合は一致しない *)
-                            let continues = is_alnum ch in
+                            let continues = tail_check ch in
                             if str = buffer && not continues then Some (offset, str) else None
                         else check (offset + 1) (buffer ^ String.make 1 ch)
             in
@@ -54,12 +56,15 @@ let tokenize reader =
         match reader cursor with None -> tokens | Some ch ->
         (* スペース *)
         if is_space ch then read_input (cursor + 1) tokens else
-        (* 2文字以上の記号 *)
+        (* 記号 *)
         let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
-        let found = List.find_map (equals ch) ["=="; "!="; "<="; ">=";] in
-        match found with Some (offset, target) -> read_reserved offset target | None ->
-        (* 1文字の記号 TODO セミコロン *)
-        match ch with '+' | '-' | '*' | '/' | '(' | ')' | '<' | '>' -> read_reserved 1 (String.make 1 ch) | _ ->
+        let search = List.find_map (equals ch) in
+        (* 2文字 *)
+        match search ["=="; "!="; "<="; ">=";] with
+            Some (offset, target) -> read_reserved offset target | None ->
+        (* 1文字 TODO セミコロン *)
+        match search ["+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
+            Some (offset, target) -> read_reserved offset target | None ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
         let rec concat_number offset number = match reader (cursor + offset) with
@@ -76,18 +81,18 @@ let tokenize reader =
     read_input 0 []
 
 let debug_print_token = function
-    | Number d -> printf "# int: %d\n" d
-    | Reserved r -> printf "# %s\n" r
-    | Identifier s -> printf "# identifier: %s\n" s
+    | Number d -> sprintf "%d" d
+    | Reserved r -> r
+    | Identifier s -> s
 
 (*let () = List.iter debug_print_token (read 1)*)
 
 (***********************************************************)
 
-type operation = Plus | MINUS | MUL | DIV
+type operation = PLUS | MINUS | MUL | DIV
     | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 let operation_of_string = function
-    | "+" -> Plus
+    | "+" -> PLUS
     | "-" -> MINUS
     | "*" -> MUL
     | "/" -> DIV
@@ -105,7 +110,8 @@ type node =
 
 let expect_int = function
     (Number d) :: tokens -> (Node_Int d, tokens)
-    | _ -> failwith "this is not int"
+    | [] -> failwith "tokens are exhausted"
+    | t :: _ -> failwith ("[" ^ debug_print_token t ^ "] is not int")
 
 let expect ~next = function
     | None -> failwith "something's lost"
@@ -186,7 +192,7 @@ let rec emit = function
         print_string   "  pop rdi\n";
         print_string   "  pop rax\n";
         begin match op with
-        | Plus -> print_string   "  add rax, rdi\n";
+        | PLUS -> print_string   "  add rax, rdi\n";
         | MINUS -> print_string   "  sub rax, rdi\n";
         | MUL -> print_string   "  imul rax, rdi\n";
         | DIV ->
