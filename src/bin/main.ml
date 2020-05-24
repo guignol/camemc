@@ -43,13 +43,17 @@ let tokenize reader =
             let length = String.length str in
             if length = 0 then None else
             let rec check offset buffer =
-                match reader (cursor + offset) with
+                let next = reader (cursor + offset) in
+                if length = offset then
+                    let found = str = buffer in
+                    match next with
+                        | None -> if found then Some (offset, str) else None
+                        | Some ch ->
+                                let continues = tail_check ch in
+                                if found && not continues then Some (offset, str) else None
+                else match next with
                     | None -> None
-                    | Some ch ->
-                        if length = offset then
-                            let continues = tail_check ch in
-                            if str = buffer && not continues then Some (offset, str) else None
-                        else check (offset + 1) (buffer ^ String.make 1 ch)
+                    | Some ch -> check (offset + 1) (buffer ^ String.make 1 ch)
             in
             check 1 (String.make 1 ch)
         in
@@ -81,9 +85,11 @@ let tokenize reader =
     read_input 0 []
 
 let debug_string_of_token = function
-    | Number d -> sprintf "%d" d
-    | Reserved r -> r
-    | Identifier s -> s
+    | Number d -> sprintf "%d(number)" d
+    | Reserved r -> sprintf "%s(reserved)" r
+    | Identifier s -> sprintf "%s(identifier)" s
+
+let print_token t = print_string (debug_string_of_token t)
 
 (*let () = List.iter debug_print_token (read 1)*)
 
@@ -111,11 +117,7 @@ type node =
 let expect_int = function
     | (Number d) :: tokens -> (Node_Int d, tokens)
     | [] -> failwith "tokens are exhausted"
-    | t :: _ -> failwith ("[" ^ debug_string_of_token t ^ "] is not int")
-
-let expect ~next = function
-    | None -> failwith "something's lost"
-    | Some s -> next (s)
+    | t :: _ -> failwith (debug_string_of_token t ^ " is not int")
 
 let consume str = function
     | [] -> None
@@ -141,6 +143,7 @@ let parse_binary_operator tokens next operators =
     recursive left tokens
 
 (*
+stmt       = expr ";"
 expr       = equality
 equality   = relational ("==" relational | "!=" relational)*
 relational = add ("<" add | "<=" add | ">" add | ">=" add)*
@@ -150,7 +153,10 @@ unary      = ("+" | "-")? primary
 primary    = num | "(" expr ")"
 *)
 
-let rec expr tokens =   equality tokens
+let rec stmt tokens =
+    let (node, tokens) = expr tokens in
+    (node, Option.get (consume ";" tokens))
+and expr tokens = equality tokens
 and equality tokens =   parse_binary_operator tokens relational ["=="; "!="]
 and relational tokens = parse_binary_operator tokens add        ["<"; "<="; ">"; ">="]
 and add tokens =        parse_binary_operator tokens mul        ["+"; "-"]
@@ -170,15 +176,13 @@ and primary tokens = match consume "(" tokens with
     | None -> expect_int tokens
     | Some tokens ->
         let (node, tokens) = expr tokens in
-        let continue tokens = (node, tokens) in
-        expect (consume ")" tokens) ~next:continue
+        (node, Option.get (consume ")" tokens))
 
 let parse tokens =
-    let (nodes, tokens) = expr tokens in
+    let (nodes, tokens) = stmt tokens in
     let () =
         (* 消費されなかったトークンがあれば出力される *)
-        printf "#";
-        let print_token t = print_string (debug_string_of_token t) in
+        printf "# [remains] ";
         List.iter print_token tokens;
         print_endline ""
     in
@@ -192,12 +196,15 @@ let emit_cmp op =
     print_string    "  movzb rax, al\n"
 
 let rec emit = function
-    | Node_Int d -> printf "  push %d\n" d
+    | Node_Int d ->
+        printf  "  push %d\n" d;
+        (* TODO returnの代替 *)
+        printf  "  mov rax, %d\n" d
     | Node_Binary (op, left, right) ->
         emit left;
         emit right;
-        print_string   "  pop rdi\n";
-        print_string   "  pop rax\n";
+        print_string    "  pop rdi\n";
+        print_string    "  pop rax\n";
         begin match op with
         | PLUS -> print_string  "  add rax, rdi\n";
         | MINUS -> print_string "  sub rax, rdi\n";
