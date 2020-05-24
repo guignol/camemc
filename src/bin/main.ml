@@ -80,7 +80,7 @@ let tokenize reader =
     in
     read_input 0 []
 
-let debug_print_token = function
+let debug_string_of_token = function
     | Number d -> sprintf "%d" d
     | Reserved r -> r
     | Identifier s -> s
@@ -109,9 +109,9 @@ type node =
     | Node_Binary of operation * node * node
 
 let expect_int = function
-    (Number d) :: tokens -> (Node_Int d, tokens)
+    | (Number d) :: tokens -> (Node_Int d, tokens)
     | [] -> failwith "tokens are exhausted"
-    | t :: _ -> failwith ("[" ^ debug_print_token t ^ "] is not int")
+    | t :: _ -> failwith ("[" ^ debug_string_of_token t ^ "] is not int")
 
 let expect ~next = function
     | None -> failwith "something's lost"
@@ -174,12 +174,14 @@ and primary tokens = match consume "(" tokens with
         expect (consume ")" tokens) ~next:continue
 
 let parse tokens =
-    let (nodes, _) = expr tokens in
-(*    let () =*)
-(*        printf "#";*)
-(*        debug_print_ast nodes;*)
-(*        print_endline ""*)
-(*    in*)
+    let (nodes, tokens) = expr tokens in
+    let () =
+        (* 消費されなかったトークンがあれば出力される *)
+        printf "#";
+        let print_token t = print_string (debug_string_of_token t) in
+        List.iter print_token tokens;
+        print_endline ""
+    in
     nodes
 
 (***********************************************************)
