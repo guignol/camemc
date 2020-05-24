@@ -34,3 +34,4 @@ _opam/
 /tmp.s
 /tmp
 /_compile/
+node_modules/
