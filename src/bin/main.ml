@@ -109,19 +109,28 @@ let operation_of_string = function
 type node =
     | Node_Int of int
     | Node_Binary of operation * node * node
-    | Node_Variable of int
+    | Node_Variable of string * int
     | Node_Assign of node * node
-
-let expect_int = function
-    | (Number d) :: tokens -> (Node_Int d, tokens)
-    | [] -> failwith "tokens are exhausted"
-    | t :: _ -> failwith (debug_string_of_token t ^ " is not int")
 
 let consume str = function
     | [] -> None
     | head :: tail -> match head with
         | Reserved r when r = str -> Some tail
         | _ -> None
+
+let consume_identifier = function
+    | [] -> None
+    | head :: tail -> match head with
+        | Identifier name -> Some (name, tail)
+        | _ -> None
+
+let expect str tokens = Option.get (consume str tokens)
+
+let expect_int = function
+    | (Number d) :: tokens -> (Node_Int d, tokens)
+    | [] -> failwith "tokens are exhausted"
+    | t :: _ -> failwith (debug_string_of_token t ^ " is not int")
+
 
 let parse_binary_operator tokens next operators =
     let (left, tokens) = next tokens in
@@ -155,7 +164,7 @@ primary    = num | identifier | "(" expr ")"
 
 let rec stmt tokens =
     let (node, tokens) = expr tokens in
-    (node, Option.get (consume ";" tokens))
+    (node, expect ";" tokens)
 and expr tokens = assign tokens
 and assign tokens =
     let (left, tokens) = equality tokens in
@@ -178,12 +187,14 @@ and unary tokens =
             let node = Node_Binary (MINUS, Node_Int 0, right) in
             (node, tokens)
         | None -> next tokens
-
 and primary tokens = match consume "(" tokens with
-    | None -> expect_int tokens
-    | Some tokens ->
-        let (node, tokens) = expr tokens in
-        (node, Option.get (consume ")" tokens))
+    | Some tokens -> let (node, tokens) = expr tokens in (node, expect ")" tokens)
+    | None -> 
+    match consume_identifier tokens with
+        | Some (name, tokens) -> 
+            let node = Node_Variable (name, 8 (* TODO *)) in
+            (node, tokens)
+        | None -> expect_int tokens
 
 let parse tokens =
     let rec program nodes = function
@@ -212,7 +223,8 @@ let emit_cmp op =
     print_string    "  movzb rax, al\n"
 
 let emit_address = function
-    | Node_Variable offset ->
+    | Node_Variable (name, offset) ->
+        printf          "  # variable [%s]\n" name;
         printf          "  lea rax, [rbp - %d]\n" offset;
         print_string    "  push rax\n"
     | _ -> failwith "This node can't emit address."
@@ -275,6 +287,7 @@ let () =
     (* プロローグ *)
     print_endline  "  push rbp";
     print_endline  "  mov rbp, rsp";
+    print_endline  "  sub rsp, 8"; (* TODO *)
     List.iter emit trees;
     print_endline  ".Lreturn.main:";
     (* エピローグ *)
