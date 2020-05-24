@@ -36,26 +36,22 @@ type token =
 
 let tokenize reader =
     let rec read_input cursor tokens =
-        let equals ch str =
+        let buffer ch length =
+            let rec get count buffer =
+                if length = count then Some buffer else
+                match reader (cursor + count) with
+                    | None -> None
+                    | Some ch -> get (count + 1) (buffer ^ String.make 1 ch)
+            in
+            get 1 (String.make 1 ch)
+        in
+        let equals ch target =
+            let length = String.length target in
+            match buffer ch length with
+                | Some str when str = target -> Some (length, target)
+                | _ -> None
             (* Keywordの場合、まだ文字が続いている場合は一致しない *)
             (*  let tail_check ch = is_alnum ch in*)
-            let tail_check _ = false in
-            let length = String.length str in
-            if length = 0 then None else
-            let rec check offset buffer =
-                let next = reader (cursor + offset) in
-                if length = offset then
-                    let found = str = buffer in
-                    match next with
-                        | None -> if found then Some (offset, str) else None
-                        | Some ch ->
-                                let continues = tail_check ch in
-                                if found && not continues then Some (offset, str) else None
-                else match next with
-                    | None -> None
-                    | Some ch -> check (offset + 1) (buffer ^ String.make 1 ch)
-            in
-            check 1 (String.make 1 ch)
         in
         match reader cursor with None -> tokens | Some ch ->
         (* スペース *)
@@ -65,10 +61,10 @@ let tokenize reader =
         let search = List.find_map (equals ch) in
         (* 2文字 *)
         match search ["=="; "!="; "<="; ">=";] with
-            Some (offset, found) -> read_reserved offset found | None ->
+            Some (_, found) -> read_reserved 2 found | None ->
         (* 1文字 *)
         match search [";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
-            Some (offset, found) -> read_reserved offset found | None ->
+            Some (_, found) -> read_reserved 1 found | None ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
         let rec concat_number offset number = match reader (cursor + offset) with
