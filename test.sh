@@ -24,6 +24,9 @@ assert() {
 		exit 1
 	fi
 }
+try 5 'aaa = 3; aaa + 2;'
+try 5 'aaa = 3; b29 = 2; b29 + aaa;'
+try 5 'O0 = 3; O0 = 2; O0 + 3;'
 
 try 5 'a = 3; a + 2;'
 try 3 'a = 3; a;'

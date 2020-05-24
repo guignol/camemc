@@ -69,14 +69,26 @@ let tokenize reader =
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
         let rec concat_number offset number = match reader (cursor + offset) with
             | None -> (offset, number)
-            | Some ch ->match degit_of_char ch with
+            | Some ch -> match degit_of_char ch with
                 | None -> (offset, number)
                 | Some n -> concat_number (offset + 1) (number * 10 + n)
         in
         let (offset, number) = concat_number 0 0 in
         if 0 < offset then read_number offset number else
-        (* その他 *)
-        read_input (cursor + 1) (tokens @ [Identifier (String.make 1 ch)])
+        (* その他識別子 *)
+        let read_identifier offset id = read_input (cursor + offset) (tokens @ [Identifier id]) in
+        let rec concat_identifier count buffer = match reader (cursor + count) with
+            | None -> None
+            | Some ch ->
+                if is_alnum ch
+                then concat_identifier (count + 1) (buffer ^ String.make 1 ch)
+                else Some (count, buffer)
+        in
+        if is_alpha ch
+        then match concat_identifier 1 (String.make 1 ch) with
+            | Some (offset, id) -> read_identifier offset id
+            | None -> failwith ""
+        else failwith ""
     in
     read_input 0 []
 
