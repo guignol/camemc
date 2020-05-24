@@ -63,7 +63,7 @@ let tokenize reader =
         match search ["=="; "!="; "<="; ">=";] with
             Some (_, found) -> read_reserved 2 found | None ->
         (* 1文字 *)
-        match search [";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
+        match search ["="; ";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
             Some (_, found) -> read_reserved 1 found | None ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
@@ -143,19 +143,27 @@ let parse_binary_operator tokens next operators =
 (*
 program    = stmt*
 stmt       = expr ";"
-expr       = equality
+expr       = assign
+assign     = equality ("=" assign)?
 equality   = relational ("==" relational | "!=" relational)*
 relational = add ("<" add | "<=" add | ">" add | ">=" add)*
 add        = mul ("+" mul | "-" mul)*
 mul        = unary ("*" unary | "/" unary)*
 unary      = ("+" | "-")? primary
-primary    = num | "(" expr ")"
+primary    = num | identifier | "(" expr ")"
 *)
 
 let rec stmt tokens =
     let (node, tokens) = expr tokens in
     (node, Option.get (consume ";" tokens))
-and expr tokens = equality tokens
+and expr tokens = assign tokens
+and assign tokens =
+    let (left, tokens) = equality tokens in
+    match consume "=" tokens with None -> (left, tokens) | Some tokens ->
+        (* 代入は右結合 *)
+        let (right, tokens) = assign tokens in
+        let node = Node_Assign (left, right) in
+        (node, tokens)
 and equality tokens =   parse_binary_operator tokens relational ["=="; "!="]
 and relational tokens = parse_binary_operator tokens add        ["<"; "<="; ">"; ">="]
 and add tokens =        parse_binary_operator tokens mul        ["+"; "-"]
