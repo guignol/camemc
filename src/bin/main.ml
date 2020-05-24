@@ -56,10 +56,10 @@ let tokenize reader =
         if is_space ch then read_input (cursor + 1) tokens else
         (* 2文字以上の記号 *)
         let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
-        let found = List.find_map (equals ch) ["=="; "!="] in
+        let found = List.find_map (equals ch) ["=="; "!="; "<="; ">=";] in
         match found with Some (offset, target) -> read_reserved offset target | None ->
-        (* 1文字の記号 *)
-        match ch with '+' | '-' | '*' | '/' | '(' | ')' -> read_reserved 1 (String.make 1 ch) | _ ->
+        (* 1文字の記号 TODO セミコロン *)
+        match ch with '+' | '-' | '*' | '/' | '(' | ')' | '<' | '>' -> read_reserved 1 (String.make 1 ch) | _ ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
         let rec concat_number offset number = match reader (cursor + offset) with
@@ -84,14 +84,19 @@ let debug_print_token = function
 
 (***********************************************************)
 
-type operation = Plus | Minus | Mul | Div | Equal | Not_Equal
+type operation = Plus | MINUS | MUL | DIV
+    | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 let operation_of_string = function
     | "+" -> Plus
-    | "-" -> Minus
-    | "*" -> Mul
-    | "/" -> Div
-    | "==" -> Equal
-    | "!=" -> Not_Equal
+    | "-" -> MINUS
+    | "*" -> MUL
+    | "/" -> DIV
+    | "==" -> EQUAL
+    | "!=" -> NOT_EQUAL
+    | "<" -> LESS_THAN
+    | "<=" -> LESS_EQUAL
+    | ">" -> GREATER_THAN
+    | ">=" -> GREATER_EQUAL
     | op -> failwith (sprintf "this operation[%s] is not supported" op)
 
 type node =
@@ -151,7 +156,7 @@ and unary tokens =
         | Some tokens ->
             let (right, tokens) = next tokens in
             (* -n = 0 - n *)
-            let node = Node_Binary (Minus, Node_Int 0, right) in
+            let node = Node_Binary (MINUS, Node_Int 0, right) in
             (node, tokens)
         | None -> next tokens
 
@@ -182,9 +187,9 @@ let rec emit = function
         print_string   "  pop rax\n";
         begin match op with
         | Plus -> print_string   "  add rax, rdi\n";
-        | Minus -> print_string   "  sub rax, rdi\n";
-        | Mul -> print_string   "  imul rax, rdi\n";
-        | Div ->
+        | MINUS -> print_string   "  sub rax, rdi\n";
+        | MUL -> print_string   "  imul rax, rdi\n";
+        | DIV ->
             (*
             cqo命令を使うと、RAXに入っている64ビットの値を128ビットに伸ばしてRDXとRAXにセットする
             idivは暗黙のうちにRDXとRAXを取って、それを合わせたものを128ビット整数とみなして、
@@ -192,13 +197,29 @@ let rec emit = function
             *)
             print_string   "  cqo\n";
             print_string   "  idiv rdi\n";
-        | Equal ->
+        | EQUAL ->
             print_string   "  cmp rax, rdi\n";
             print_string   "  sete al\n";
             print_string   "  movzb rax, al\n";
-        | Not_Equal ->
+        | NOT_EQUAL ->
             print_string   "  cmp rax, rdi\n";
             print_string   "  setne al\n";
+            print_string   "  movzb rax, al\n";
+        | LESS_THAN ->
+            print_string   "  cmp rax, rdi\n";
+            print_string   "  setl al\n";
+            print_string   "  movzb rax, al\n";
+        | LESS_EQUAL ->
+            print_string   "  cmp rax, rdi\n";
+            print_string   "  setle al\n";
+            print_string   "  movzb rax, al\n";
+        | GREATER_THAN ->
+            print_string   "  cmp rax, rdi\n";
+            print_string   "  setg al\n";
+            print_string   "  movzb rax, al\n";
+        | GREATER_EQUAL ->
+            print_string   "  cmp rax, rdi\n";
+            print_string   "  setge al\n";
             print_string   "  movzb rax, al\n";
         end;
         print_string   "  push rax\n"
