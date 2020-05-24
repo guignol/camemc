@@ -109,6 +109,8 @@ let operation_of_string = function
 type node =
     | Node_Int of int
     | Node_Binary of operation * node * node
+    | Node_Variable of int
+    | Node_Assign of node * node
 
 let expect_int = function
     | (Number d) :: tokens -> (Node_Int d, tokens)
@@ -139,6 +141,7 @@ let parse_binary_operator tokens next operators =
     recursive left tokens
 
 (*
+program    = stmt*
 stmt       = expr ";"
 expr       = equality
 equality   = relational ("==" relational | "!=" relational)*
@@ -177,10 +180,9 @@ and primary tokens = match consume "(" tokens with
 let parse tokens =
     let (nodes, tokens) = stmt tokens in
     let () =
-        (* 消費されなかったトークンがあれば出力される *)
-        printf "# [remains] ";
-        List.iter print_token tokens;
-        print_endline ""
+        if 0 < List.length tokens then
+            (* 消費されなかったトークンがあれば出力される *)
+            printf "# [remains] "; List.iter print_token tokens; print_endline "";
     in
     nodes
 
@@ -191,7 +193,28 @@ let emit_cmp op =
     printf          "  %s al\n" op;
     print_string    "  movzb rax, al\n"
 
+let emit_address = function
+    | Node_Variable offset ->
+        printf          "  lea rax, [rbp - %d]\n" offset;
+        print_string    "  push rax\n"
+    | _ -> failwith "This node can't emit address."
+
+let load _ =
+    print_string    "  pop rax\n";
+    (* 8byte == 64bit *)
+    print_string    "  mov rax, [rax]\n"
+
 let rec emit = function
+    | Node_Variable _ as v ->
+        emit_address v;
+        load v
+    | Node_Assign (left, right) ->
+        emit_address left;
+        emit right;
+        print_string    "  pop rax\n";
+        print_string    "  pop rdi\n";
+        print_string    "  mov QWORD PTR [rdi], rax\n";
+        print_string    "  push rax\n"
     | Node_Int d ->
         printf  "  push %d\n" d;
         (* TODO returnの代替 *)
@@ -213,12 +236,12 @@ let rec emit = function
             *)
             print_string   "  cqo\n";
             print_string   "  idiv rdi\n";
-        | EQUAL         -> emit_cmp    "sete"
-        | NOT_EQUAL     -> emit_cmp    "setne"
-        | LESS_THAN     -> emit_cmp    "setl"
-        | LESS_EQUAL    -> emit_cmp    "setle"
-        | GREATER_THAN  -> emit_cmp    "setg"
-        | GREATER_EQUAL -> emit_cmp    "setge"
+        | EQUAL         -> emit_cmp "sete"
+        | NOT_EQUAL     -> emit_cmp "setne"
+        | LESS_THAN     -> emit_cmp "setl"
+        | LESS_EQUAL    -> emit_cmp "setle"
+        | GREATER_THAN  -> emit_cmp "setg"
+        | GREATER_EQUAL -> emit_cmp "setge"
         end;
         print_string   "  push rax\n"
 
