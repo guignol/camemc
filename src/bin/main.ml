@@ -61,10 +61,10 @@ let tokenize reader =
         let search = List.find_map (equals ch) in
         (* 2文字 *)
         match search ["=="; "!="; "<="; ">=";] with
-            Some (offset, target) -> read_reserved offset target | None ->
-        (* 1文字 TODO セミコロン *)
-        match search ["+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
-            Some (offset, target) -> read_reserved offset target | None ->
+            Some (offset, found) -> read_reserved offset found | None ->
+        (* 1文字 *)
+        match search [";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
+            Some (offset, found) -> read_reserved offset found | None ->
         (* 数値 *)
         let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
         let rec concat_number offset number = match reader (cursor + offset) with
@@ -184,6 +184,11 @@ let parse tokens =
 
 (***********************************************************)
 
+let emit_cmp op =
+    print_string    "  cmp rax, rdi\n";
+    printf          "  %s al\n" op;
+    print_string    "  movzb rax, al\n"
+
 let rec emit = function
     | Node_Int d -> printf "  push %d\n" d
     | Node_Binary (op, left, right) ->
@@ -192,8 +197,8 @@ let rec emit = function
         print_string   "  pop rdi\n";
         print_string   "  pop rax\n";
         begin match op with
-        | PLUS -> print_string   "  add rax, rdi\n";
-        | MINUS -> print_string   "  sub rax, rdi\n";
+        | PLUS -> print_string  "  add rax, rdi\n";
+        | MINUS -> print_string "  sub rax, rdi\n";
         | MUL -> print_string   "  imul rax, rdi\n";
         | DIV ->
             (*
@@ -203,30 +208,12 @@ let rec emit = function
             *)
             print_string   "  cqo\n";
             print_string   "  idiv rdi\n";
-        | EQUAL ->
-            print_string   "  cmp rax, rdi\n";
-            print_string   "  sete al\n";
-            print_string   "  movzb rax, al\n";
-        | NOT_EQUAL ->
-            print_string   "  cmp rax, rdi\n";
-            print_string   "  setne al\n";
-            print_string   "  movzb rax, al\n";
-        | LESS_THAN ->
-            print_string   "  cmp rax, rdi\n";
-            print_string   "  setl al\n";
-            print_string   "  movzb rax, al\n";
-        | LESS_EQUAL ->
-            print_string   "  cmp rax, rdi\n";
-            print_string   "  setle al\n";
-            print_string   "  movzb rax, al\n";
-        | GREATER_THAN ->
-            print_string   "  cmp rax, rdi\n";
-            print_string   "  setg al\n";
-            print_string   "  movzb rax, al\n";
-        | GREATER_EQUAL ->
-            print_string   "  cmp rax, rdi\n";
-            print_string   "  setge al\n";
-            print_string   "  movzb rax, al\n";
+        | EQUAL         -> emit_cmp    "sete"
+        | NOT_EQUAL     -> emit_cmp    "setne"
+        | LESS_THAN     -> emit_cmp    "setl"
+        | LESS_EQUAL    -> emit_cmp    "setle"
+        | GREATER_THAN  -> emit_cmp    "setg"
+        | GREATER_EQUAL -> emit_cmp    "setge"
         end;
         print_string   "  push rax\n"
 
