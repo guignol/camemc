@@ -72,7 +72,7 @@ let rec calculate_stack_offset stack m = function
     | Node.Node_Int _ -> (stack, m)
     | Node.Node_Variable name ->
         begin
-        match (find_opt name m) with
+            match (find_opt name m) with
             | Some _ -> (stack, m)
             | None ->
                 (* TODO 型ごとのサイズ *)

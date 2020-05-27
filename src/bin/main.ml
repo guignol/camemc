@@ -3,10 +3,9 @@
 (* https://stackoverflow.com/questions/9863036/ocaml-function-parameter-pattern-matching-for-strings *)
 
 
-let () = 
+let () =
     let input = Sys.argv.(1) in
     let reader index = try Some input.[index] with _ -> None in
-    Emit.e 
+    Emit.e
         (Node.parse
-            (Token.tokenize reader))
-        
+             (Token.tokenize reader))

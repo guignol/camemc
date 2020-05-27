@@ -1,0 +1,9 @@
+base = 4
+type = 4
+in = 0
+with = 0
+match_clause = 4
+ppx_stritem_ext = 4
+max_indent = none
+strict_with = auto, with=0
+strict_else = auto

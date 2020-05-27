@@ -2,8 +2,8 @@
 open Printf
 
 type operation = PLUS | MINUS | MUL | DIV
-    | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
-	
+               | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
+
 type node =
     | Node_Int of int
     | Node_Binary of operation * node * node
@@ -92,16 +92,16 @@ and unary tokens =
     let next tokens = primary tokens in
     match consume "+" tokens with Some tokens -> next tokens | None ->
     match consume "-" tokens with
-        | Some tokens ->
-            let (right, tokens) = next tokens in
-            (* -n = 0 - n *)
-            let node = Node_Binary (MINUS, Node_Int 0, right) in
-            (node, tokens)
-        | None -> next tokens
+    | Some tokens ->
+        let (right, tokens) = next tokens in
+        (* -n = 0 - n *)
+        let node = Node_Binary (MINUS, Node_Int 0, right) in
+        (node, tokens)
+    | None -> next tokens
 and primary tokens = match consume "(" tokens with
     | Some tokens -> let (node, tokens) = expr tokens in (node, expect ")" tokens)
     | None -> 
-    match consume_identifier tokens with
+        match consume_identifier tokens with
         | Some (name, tokens) -> 
             let node = Node_Variable name in
             (node, tokens)
@@ -117,11 +117,11 @@ let parse tokens =
     in
     let (nodes, tokens) = program [] tokens in
     let () = if 0 < List.length tokens then
-        (* 消費されなかったトークンがあれば出力される *)
-        begin
-        printf "# [remains] ";
-        List.iter Token.print_token tokens;
-        print_endline ""
-        end
+            (* 消費されなかったトークンがあれば出力される *)
+            begin
+                printf "# [remains] ";
+                List.iter Token.print_token tokens;
+                print_endline ""
+            end
     in
     nodes
