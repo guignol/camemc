@@ -2,6 +2,11 @@
 open Printf
 open String
 
+type token =
+  | Number of int
+  | Reserved of string
+  | Identifier of string
+
 let starts_with str ch = match index_opt str ch with
     | Some index -> index = 0
     | None -> false
@@ -22,11 +27,6 @@ let is_alpha = function 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
 let is_alnum ch = is_alpha ch || (degit_of_char ch) <> None
 (* cf. string.ml *)
 let is_space = function ' ' | '\012' | '\n' | '\r' | '\t' -> true | _ -> false
-
-type token =
-  | Number of int
-  | Reserved of string
-  | Identifier of string
 
 let tokenize reader =
     let rec read_input cursor tokens =

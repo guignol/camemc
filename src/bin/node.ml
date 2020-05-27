@@ -1,9 +1,15 @@
 
 open Printf
-open Token
 
 type operation = PLUS | MINUS | MUL | DIV
     | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
+	
+type node =
+    | Node_Int of int
+    | Node_Binary of operation * node * node
+    | Node_Variable of string
+    | Node_Assign of node * node
+
 let operation_of_string = function
     | "+" -> PLUS
     | "-" -> MINUS
@@ -17,30 +23,24 @@ let operation_of_string = function
     | ">=" -> GREATER_EQUAL
     | op -> failwith (sprintf "this operation[%s] is not supported" op)
 
-type node =
-    | Node_Int of int
-    | Node_Binary of operation * node * node
-    | Node_Variable of string
-    | Node_Assign of node * node
-
 let consume str = function
     | [] -> None
     | head :: tail -> match head with
-        | Reserved r when r = str -> Some tail
+        | Token.Reserved r when r = str -> Some tail
         | _ -> None
 
 let consume_identifier = function
     | [] -> None
     | head :: tail -> match head with
-        | Identifier name -> Some (name, tail)
+        | Token.Identifier name -> Some (name, tail)
         | _ -> None
 
 let expect str tokens = Option.get (consume str tokens)
 
 let expect_int = function
-    | (Number d) :: tokens -> (Node_Int d, tokens)
+    | (Token.Number d) :: tokens -> (Node_Int d, tokens)
     | [] -> failwith "tokens are exhausted"
-    | t :: _ -> failwith (debug_string_of_token t ^ " is not int")
+    | t :: _ -> failwith (Token.debug_string_of_token t ^ " is not int")
 
 
 let parse_binary_operator tokens next operators =
@@ -120,7 +120,7 @@ let parse tokens =
         (* 消費されなかったトークンがあれば出力される *)
         begin
         printf "# [remains] ";
-        List.iter print_token tokens;
+        List.iter Token.print_token tokens;
         print_endline ""
         end
     in
