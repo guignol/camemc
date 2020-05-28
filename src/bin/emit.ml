@@ -11,7 +11,7 @@ let emit_cmp op =
     print_string    "  movzb rax, al\n"
 
 let emit_address var_map = function
-    | Node.Node_Variable name ->
+    | Ast.Node_Variable name ->
         let offset = find name var_map in
         printf          "  # variable [%s]\n" name;
         printf          "  lea rax, [rbp - %d]\n" offset;
@@ -26,21 +26,21 @@ let load _ =
 let emit var_map nodes = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
-        | Node.Node_Variable _ as v ->
+        | Ast.Node_Variable _ as v ->
             emit_address v;
             load v
-        | Node.Node_Assign (left, right) ->
+        | Ast.Node_Assign (left, right) ->
             emit_address left;
             emit_inner right;
             print_string    "  pop rax\n";
             print_string    "  pop rdi\n";
             print_string    "  mov QWORD PTR [rdi], rax\n";
             print_string    "  push rax\n"
-        | Node.Node_Int d ->
+        | Ast.Node_Int d ->
             printf  "  push %d\n" d;
             (* TODO returnの代替 *)
             printf  "  mov rax, %d\n" d
-        | Node.Node_Binary (op, left, right) ->
+        | Ast.Node_Binary (op, left, right) ->
             emit_inner left;
             emit_inner right;
             print_string    "  pop rdi\n";
@@ -69,8 +69,8 @@ let emit var_map nodes =
     emit_inner nodes
 
 let rec calculate_stack_offset stack m = function
-    | Node.Node_Int _ -> (stack, m)
-    | Node.Node_Variable name ->
+    | Ast.Node_Int _ -> (stack, m)
+    | Ast.Node_Variable name ->
         begin
             match (find_opt name m) with
             | Some _ -> (stack, m)
@@ -80,11 +80,11 @@ let rec calculate_stack_offset stack m = function
                 let offset = stack + size in
                 (offset, add name offset m)
         end
-    | Node.Node_Assign (left, right) -> 
+    | Ast.Node_Assign (left, right) -> 
         let (stack, m) = calculate_stack_offset stack m left in
         let (stack, m) = calculate_stack_offset stack m right in
         (stack, m)
-    | Node.Node_Binary (_, left, right) ->
+    | Ast.Node_Binary (_, left, right) ->
         let (stack, m) = calculate_stack_offset stack m left in
         let (stack, m) = calculate_stack_offset stack m right in
         (stack, m)

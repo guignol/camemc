@@ -7,5 +7,5 @@ let () =
     let input = Sys.argv.(1) in
     let reader index = try Some input.[index] with _ -> None in
     Emit.e
-        (Node.parse
+        (Ast.parse
              (Token.tokenize reader))

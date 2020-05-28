@@ -47,20 +47,21 @@ let tokenize reader =
             (* Keywordの場合、まだ文字が続いている場合は一致しない *)
             (*  let tail_check ch = is_alnum ch in*)
         in
+        let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
+        let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
+        let read_identifier offset id = read_input (cursor + offset) (tokens @ [Identifier id]) in
         match reader cursor with None -> tokens | Some ch ->
             (* スペース *)
             if is_space ch then read_input (cursor + 1) tokens else
             (* 記号 *)
-            let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
             let search = List.find_map (equals ch) in
             (* 2文字 *)
-            match search ["=="; "!="; "<="; ">=";] with
+            match search ["=="; "!="; "<="; ">=";] with 
             | Some (_, found) -> read_reserved 2 found | None ->
                 (* 1文字 *)
-                match search ["="; ";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with
+                match search ["="; ";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"] with 
                 | Some (_, found) -> read_reserved 1 found | None ->
                     (* 数値 *)
-                    let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
                     let rec concat_number offset number = match reader (cursor + offset) with
                         | None -> (offset, number)
                         | Some ch -> match degit_of_char ch with
@@ -70,7 +71,6 @@ let tokenize reader =
                     let (offset, number) = concat_number 0 0 in
                     if 0 < offset then read_number offset number else
                     (* その他識別子 *)
-                    let read_identifier offset id = read_input (cursor + offset) (tokens @ [Identifier id]) in
                     let rec concat_identifier count buffer = match reader (cursor + count) with
                         | None -> None
                         | Some ch ->
