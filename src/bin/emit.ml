@@ -26,6 +26,9 @@ let load _ =
 let emit var_map nodes = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
+        | Ast.Node_Return node -> 
+            emit_inner node;
+            print_string	"  jmp .Lreturn.main\n"
         | Ast.Node_Variable _ as v ->
             emit_address v;
             load v
@@ -69,6 +72,7 @@ let emit var_map nodes =
     emit_inner nodes
 
 let rec calculate_stack_offset stack m = function
+    | Ast.Node_Return node -> calculate_stack_offset stack m node
     | Ast.Node_Int _ -> (stack, m)
     | Ast.Node_Variable name ->
         begin

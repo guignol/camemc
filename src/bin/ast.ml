@@ -9,6 +9,7 @@ type node =
     | Node_Binary of operation * node * node
     | Node_Variable of string
     | Node_Assign of node * node
+    | Node_Return of node
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -62,7 +63,7 @@ let parse_binary_operator tokens next operators =
 
 (*
 program    = stmt*
-stmt       = expr ";"
+stmt       = ("return")? expr ";"
 expr       = assign
 assign     = equality ("=" assign)?
 equality   = relational ("==" relational | "!=" relational)*
@@ -74,7 +75,10 @@ primary    = num | identifier | "(" expr ")"
 *)
 
 let rec stmt tokens =
-    let (node, tokens) = expr tokens in
+    let (node, tokens) = match consume "return" tokens with 
+        | None -> expr tokens 
+        | Some tokens -> let (node, tokens) = expr tokens in (Node_Return node, tokens)
+    in
     (node, expect ";" tokens)
 and expr tokens = assign tokens
 and assign tokens =
