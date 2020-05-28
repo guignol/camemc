@@ -1,7 +1,7 @@
 #!/bin/bash
 
 try() {
-#	assert "$1" "int main() { return $2; }"
+	#	assert "$1" "int main() { return $2; }"
 	assert "$1" "$2"
 }
 
@@ -9,11 +9,11 @@ assert() {
 	expected="$1"
 	input="$2"
 
-  DIR="_compile"
-  mkdir -p ${DIR}
-  dune exec camer "--" "$input" > ${DIR}/tmp.s
-  gcc -static -o ${DIR}/tmp ${DIR}/tmp.s
-  ${DIR}/tmp
+	DIR="_compile"
+	mkdir -p ${DIR}
+	dune exec camer "--" "$input" >${DIR}/tmp.s
+	gcc -static -o ${DIR}/tmp ${DIR}/tmp.s
+	${DIR}/tmp
 	actual="$?"
 
 	if [ "$actual" = "$expected" ]; then
@@ -24,6 +24,10 @@ assert() {
 		exit 1
 	fi
 }
+
+# try 25 'a_3 = 12; _loc = 3; return a_3 * _loc - 11;'
+# try 25 'a_3 = 12; _loc = 3; return a_3 * _loc - 11; 24;'
+
 try 5 'aaa = 3; aaa + 2;'
 try 5 'aaa = 3; b29 = 2; b29 + aaa;'
 try 5 'O0 = 3; O0 = 2; O0 + 3;'

@@ -30,18 +30,21 @@ let is_space = function ' ' | '\012' | '\n' | '\r' | '\t' -> true | _ -> false
 
 let tokenize reader =
     let rec read_input cursor tokens =
-        let buffer ch length =
+        let buffer ch length tail_check =
             let rec get count buffer =
-                if length = count then Some buffer else
-                match reader (cursor + count) with
-                | None -> None
-                | Some ch -> get (count + 1) (buffer ^ String.make 1 ch)
+                if length = count then
+                    match reader (cursor + count) with
+                    | None -> Some buffer (* 末尾 *)
+                    | Some ch -> if tail_check ch then Some buffer else None
+                else match reader (cursor + count) with
+                    | None -> None
+                    | Some ch -> get (count + 1) (buffer ^ String.make 1 ch)
             in
             get 1 (String.make 1 ch)
         in
         let equals ch target =
             let length = String.length target in
-            match buffer ch length with
+            match buffer ch length (fun _ -> true) with
             | Some str when str = target -> Some (length, target)
             | _ -> None
             (* Keywordの場合、まだ文字が続いている場合は一致しない *)
@@ -53,6 +56,8 @@ let tokenize reader =
         match reader cursor with None -> tokens | Some ch ->
             (* スペース *)
             if is_space ch then read_input (cursor + 1) tokens else
+            (* Keyword *)
+
             (* 記号 *)
             let search = List.find_map (equals ch) in
             (* 2文字 *)
