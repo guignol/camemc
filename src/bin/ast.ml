@@ -49,13 +49,16 @@ let expect str tokens =
         in
         failwith (str ^ " is expected but " ^ token_name)
 
+let end_with str parser tokens = 
+    let (node, tokens) = parser tokens in
+    (node, expect str tokens)
+
 let expect_int = function
     | (Token.Number d) :: tokens -> (Node_Int d, tokens)
     | [] -> failwith "tokens are exhausted"
     | t :: _ -> failwith (Token.debug_string_of_token t ^ " is not int")
 
-
-let parse_binary_operator tokens next operators =
+let binary tokens next operators =
     let (left, tokens) = next tokens in
     let rec recursive left tokens =
         let rec consume_operator = function
@@ -91,14 +94,12 @@ primary    = num | identifier | "(" expr ")"
 
 let rec stmt tokens =
     let node_return tokens = 
-        let (node, tokens) = expr tokens in 
-        let tokens = expect ";" tokens in
-        (Node_Return node, tokens)
+        let (node, tokens) = expr tokens in
+        (Node_Return node, expect ";" tokens)
     in
     let node_if tokens = 
         let tokens = expect "(" tokens in
-        let (condition, tokens) = expr tokens in
-        let tokens = expect ")" tokens in
+        let (condition, tokens) = end_with ")" expr tokens in
         let (if_true, tokens) = stmt tokens in
         let (if_false, tokens) = match consume "else" tokens with
             | Some tokens -> stmt tokens
@@ -107,8 +108,7 @@ let rec stmt tokens =
     in
     let node_while tokens = 
         let tokens = expect "(" tokens in
-        let (condition, tokens) = expr tokens in
-        let tokens = expect ")" tokens in
+        let (condition, tokens) = end_with ")" expr tokens in
         let (execution, tokens) = stmt tokens in
         (Node_While (condition, execution), tokens)
     in
@@ -116,46 +116,31 @@ let rec stmt tokens =
         let tokens = expect "(" tokens in
         let (init, tokens) = match consume ";" tokens with
             | Some tokens -> (Node_Int 1, tokens) (* 初期化式なし *)
-            | None -> 
-				let (node, tokens) = expr tokens in
-                let tokens = expect ";" tokens in 
-                (node, tokens) in
+            | None -> end_with ";" expr tokens in
         let (condition, tokens) = match consume ";" tokens with
             | Some tokens -> (Node_Int 1, tokens) (* 条件式なし *)
-            | None -> 
-				let (node, tokens) = expr tokens in
-                let tokens = expect ";" tokens in 
-                (node, tokens) in
+            | None -> end_with ";" expr tokens in
         let (iteration, tokens) = match consume ")" tokens with
             | Some tokens -> (Node_Int 1, tokens) (* 反復式なし *)
-            | None -> 
-				let (node, tokens) = expr tokens in
-                let tokens = expect ")" tokens in 
-                (node, tokens) in
+            | None -> end_with ")" expr tokens in
         let (execution, tokens) = stmt tokens in
         (Node_For (init, condition, iteration, execution), tokens)
-    in
-    let node_expression tokens =
-        let (node, tokens) = expr tokens in
-        (node, expect ";" tokens)
     in
     match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
     match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
     match consume "while" tokens with | Some tokens -> node_while tokens | None -> 
     match consume "for" tokens with | Some tokens -> node_for tokens | None -> 
-        node_expression tokens
+        end_with ";" expr tokens
 and expr tokens = assign tokens
 and assign tokens =
     let (left, tokens) = equality tokens in
     match consume "=" tokens with None -> (left, tokens) | Some tokens ->
-        (* 代入は右結合 *)
-        let (right, tokens) = assign tokens in
-        let node = Node_Assign (left, right) in
-        (node, tokens)
-and equality tokens =   parse_binary_operator tokens relational ["=="; "!="]
-and relational tokens = parse_binary_operator tokens add        ["<"; "<="; ">"; ">="]
-and add tokens =        parse_binary_operator tokens mul        ["+"; "-"]
-and mul tokens =        parse_binary_operator tokens unary      ["*"; "/"]
+        let (right, tokens) = assign tokens in (* 代入は右結合 *)
+        (Node_Assign (left, right), tokens)
+and equality tokens =   binary tokens relational ["=="; "!="]
+and relational tokens = binary tokens add        ["<"; "<="; ">"; ">="]
+and add tokens =        binary tokens mul        ["+"; "-"]
+and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
     match consume "+" tokens with Some tokens -> next tokens | None ->
@@ -163,16 +148,13 @@ and unary tokens =
     | Some tokens ->
         let (right, tokens) = next tokens in
         (* -n = 0 - n *)
-        let node = Node_Binary (MINUS, Node_Int 0, right) in
-        (node, tokens)
+        (Node_Binary (MINUS, Node_Int 0, right), tokens)
     | None -> next tokens
 and primary tokens = match consume "(" tokens with
-    | Some tokens -> let (node, tokens) = expr tokens in (node, expect ")" tokens)
+    | Some tokens -> end_with ")" expr tokens
     | None -> 
         match consume_identifier tokens with
-        | Some (name, tokens) -> 
-            let node = Node_Variable name in
-            (node, tokens)
+        | Some (name, tokens) -> (Node_Variable name, tokens)
         | None -> expect_int tokens
 
 let parse tokens =
