@@ -13,6 +13,7 @@ type node =
     | Node_Return of node
     | Node_If of node * node * node
     | Node_While of node * node
+    | Node_For of node * node * node * node
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -108,8 +109,31 @@ let rec stmt tokens =
         let tokens = expect "(" tokens in
         let (condition, tokens) = expr tokens in
         let tokens = expect ")" tokens in
-        let (if_true, tokens) = stmt tokens in
-        (Node_While (condition, if_true), tokens)
+        let (execution, tokens) = stmt tokens in
+        (Node_While (condition, execution), tokens)
+    in
+    let node_for tokens =
+        let tokens = expect "(" tokens in
+        let (init, tokens) = match consume ";" tokens with
+            | Some tokens -> (Node_Int 1, tokens) (* 初期化式なし *)
+            | None -> 
+				let (node, tokens) = expr tokens in
+                let tokens = expect ";" tokens in 
+                (node, tokens) in
+        let (condition, tokens) = match consume ";" tokens with
+            | Some tokens -> (Node_Int 1, tokens) (* 条件式なし *)
+            | None -> 
+				let (node, tokens) = expr tokens in
+                let tokens = expect ";" tokens in 
+                (node, tokens) in
+        let (iteration, tokens) = match consume ")" tokens with
+            | Some tokens -> (Node_Int 1, tokens) (* 反復式なし *)
+            | None -> 
+				let (node, tokens) = expr tokens in
+                let tokens = expect ")" tokens in 
+                (node, tokens) in
+        let (execution, tokens) = stmt tokens in
+        (Node_For (init, condition, iteration, execution), tokens)
     in
     let node_expression tokens =
         let (node, tokens) = expr tokens in
@@ -118,6 +142,7 @@ let rec stmt tokens =
     match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
     match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
     match consume "while" tokens with | Some tokens -> node_while tokens | None -> 
+    match consume "for" tokens with | Some tokens -> node_for tokens | None -> 
         node_expression tokens
 and expr tokens = assign tokens
 and assign tokens =

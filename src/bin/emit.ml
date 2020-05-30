@@ -27,20 +27,42 @@ let load _ =
 let emit var_map nodes = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
-		| Ast.Node_No_Op -> 
-			print_string	"  # no else\n"
-        | Ast.Node_While (condition, if_true) ->
+        | Ast.Node_No_Op -> 
+            print_string	"  # no op\n"
+        | Ast.Node_For (init, condition, iteration, execution) ->
+            let context = 333 in
+            (* init *)
+            emit_inner init;
+            print_string	"  pop rax\n";
+            (* begin *)
+            printf			".Lcondition%d:\n" context;
+            (* condition *)
+            emit_inner condition;
+            (* if 0, goto end *)
+            print_string	"  pop rax\n";
+            print_string	"  cmp rax, 0\n";
+            printf			"  je .Lbreak%d\n" context;
+            (* execute *)
+            emit_inner execution;
+            (* post execute *)
+            printf			".Lcontinue%d:\n" context;
+            emit_inner iteration;
+            (* goto begin *)
+            printf			"  jmp .Lcondition%d\n" context;
+            (* end *)
+            printf			".Lbreak%d:\n" context
+        | Ast.Node_While (condition, execution) ->
             let context = 222 in
             (* begin: *)
-			printf			".Lcontinue%d:\n" context;
+            printf			".Lcontinue%d:\n" context;
             (* condition *)
-			emit_inner condition;
+            emit_inner condition;
             (* if 0, goto end *)
             print_string	"  pop rax\n";
             print_string	"  cmp rax, 0\n";
             printf			"  je  .Lbreak%d\n" context;
             (* execute & goto begin *)
-			emit_inner if_true;
+            emit_inner execution;
             printf			"  jmp .Lcontinue%d\n" context;
             (* end: *)
             printf			".Lbreak%d:\n" context
@@ -102,10 +124,16 @@ let emit var_map nodes =
     emit_inner nodes
 
 let rec calculate_stack_offset stack m = function
-	| Ast.Node_No_Op -> (stack, m)
-    | Ast.Node_While (condition, if_true) ->
+    | Ast.Node_No_Op -> (stack, m)
+    | Ast.Node_For (init, condition, iteration, execution) ->
+        let (stack, m) = calculate_stack_offset stack m init in
         let (stack, m) = calculate_stack_offset stack m condition in
-        let (stack, m) = calculate_stack_offset stack m if_true in
+        let (stack, m) = calculate_stack_offset stack m iteration in
+        let (stack, m) = calculate_stack_offset stack m execution in
+        (stack, m)
+    | Ast.Node_While (condition, execution) ->
+        let (stack, m) = calculate_stack_offset stack m condition in
+        let (stack, m) = calculate_stack_offset stack m execution in
         (stack, m)
     | Ast.Node_If (condition, if_true, if_false) ->
         let (stack, m) = calculate_stack_offset stack m condition in
