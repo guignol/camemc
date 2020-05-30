@@ -29,6 +29,22 @@ let emit var_map nodes =
     let rec emit_inner = function
 		| Ast.Node_No_Op -> 
 			print_string	"  # no else\n"
+        | Ast.Node_While (condition, if_true) ->
+            let context = 222 in
+            (* begin: *)
+			printf			".Lcontinue%d:\n" context;
+            (* condition *)
+			emit_inner condition;
+            (* if 0, goto end *)
+            print_string	"  pop rax\n";
+            print_string	"  cmp rax, 0\n";
+            printf			"  je  .Lbreak%d\n" context;
+            (* execute & goto begin *)
+			emit_inner if_true;
+            printf			"  jmp .Lcontinue%d\n" context;
+            (* end: *)
+            printf			".Lbreak%d:\n" context
+
         | Ast.Node_If (condition, if_true, if_false) ->
             let context = 111 in
             emit_inner condition;
@@ -87,6 +103,10 @@ let emit var_map nodes =
 
 let rec calculate_stack_offset stack m = function
 	| Ast.Node_No_Op -> (stack, m)
+    | Ast.Node_While (condition, if_true) ->
+        let (stack, m) = calculate_stack_offset stack m condition in
+        let (stack, m) = calculate_stack_offset stack m if_true in
+        (stack, m)
     | Ast.Node_If (condition, if_true, if_false) ->
         let (stack, m) = calculate_stack_offset stack m condition in
         let (stack, m) = calculate_stack_offset stack m if_true in

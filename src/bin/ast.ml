@@ -12,6 +12,7 @@ type node =
     | Node_Assign of node * node
     | Node_Return of node
     | Node_If of node * node * node
+    | Node_While of node * node
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -103,10 +104,21 @@ let rec stmt tokens =
             | None -> (Node_No_Op, tokens) in
         (Node_If (condition, if_true, if_false), tokens)
     in
-    match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
-    match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
+    let node_while tokens = 
+        let tokens = expect "(" tokens in
+        let (condition, tokens) = expr tokens in
+        let tokens = expect ")" tokens in
+        let (if_true, tokens) = stmt tokens in
+        (Node_While (condition, if_true), tokens)
+    in
+    let node_expression tokens =
         let (node, tokens) = expr tokens in
         (node, expect ";" tokens)
+    in
+    match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
+    match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
+    match consume "while" tokens with | Some tokens -> node_while tokens | None -> 
+        node_expression tokens
 and expr tokens = assign tokens
 and assign tokens =
     let (left, tokens) = equality tokens in

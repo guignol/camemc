@@ -25,6 +25,10 @@ assert() {
 	fi
 }
 
+# try 99 'int a; a = 0; int i; for (i = 0; i < 10; i = i + 1) a = a + 1; return 99;'
+# try 10 'int a; a = 0; int i; for (i = 0; i < 10; i = i + 1) a = a + 1; return a;'
+try 10 'a = 0; while (a < 10) a = a + 1; return a;'
+
 try 37 'a = 1983; b = 2020; if ((b - a) == 37) return 37; else return 36;'
 try 12 'a = 13; if (a == 0) return 3; else return 12;'
 try 12 'if (0) return 3; else return 12;'
