@@ -21,11 +21,25 @@ let emit_address var_map = function
 let load _ =
     print_string    "  pop rax\n";
     (* 8byte == 64bit *)
-    print_string    "  mov rax, [rax]\n"
+    print_string    "  mov rax, [rax]\n";
+    print_string    "  push rax\n"
 
 let emit var_map nodes = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
+		| Ast.Node_No_Op -> 
+			print_string	"  # no else\n"
+        | Ast.Node_If (condition, if_true, if_false) ->
+            let context = 111 in
+            emit_inner condition;
+            print_string    "  pop rax\n";
+            print_string    "  cmp rax, 0\n";
+            printf		    "  je  .Lelse%d\n" context;
+            emit_inner if_true;
+            printf    		"  jmp .Lend%d\n" context;
+            printf		    ".Lelse%d:\n" context;
+            emit_inner if_false;
+            printf    		".Lend%d:\n" context
         | Ast.Node_Return node -> 
             emit_inner node;
             print_string	"  jmp .Lreturn.main\n"
@@ -72,6 +86,12 @@ let emit var_map nodes =
     emit_inner nodes
 
 let rec calculate_stack_offset stack m = function
+	| Ast.Node_No_Op -> (stack, m)
+    | Ast.Node_If (condition, if_true, if_false) ->
+        let (stack, m) = calculate_stack_offset stack m condition in
+        let (stack, m) = calculate_stack_offset stack m if_true in
+        let (stack, m) = calculate_stack_offset stack m if_false in
+        (stack, m)
     | Ast.Node_Return node -> calculate_stack_offset stack m node
     | Ast.Node_Int _ -> (stack, m)
     | Ast.Node_Variable name ->

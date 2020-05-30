@@ -5,11 +5,13 @@ type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
 type node =
+    | Node_No_Op
     | Node_Int of int
     | Node_Binary of operation * node * node
     | Node_Variable of string
     | Node_Assign of node * node
     | Node_Return of node
+    | Node_If of node * node * node
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -36,7 +38,14 @@ let consume_identifier = function
         | Token.Identifier name -> Some (name, tail)
         | _ -> None
 
-let expect str tokens = Option.get (consume str tokens)
+let expect str tokens = 
+    try Option.get (consume str tokens) 
+    with Invalid_argument _ ->
+        let token_name = match tokens with
+            | [] -> "none"
+            | t :: _ -> Token.debug_string_of_token t
+        in
+        failwith (str ^ " is expected but " ^ token_name)
 
 let expect_int = function
     | (Token.Number d) :: tokens -> (Node_Int d, tokens)
@@ -64,6 +73,10 @@ let parse_binary_operator tokens next operators =
 (*
 program    = stmt*
 stmt       = ("return")? expr ";"
+        	| "{" stmt* "}"
+	        | "if" "(" expr ")" stmt ("else" stmt)?
+			| "while" "(" expr ")" stmt
+        	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 expr       = assign
 assign     = equality ("=" assign)?
 equality   = relational ("==" relational | "!=" relational)*
@@ -75,11 +88,25 @@ primary    = num | identifier | "(" expr ")"
 *)
 
 let rec stmt tokens =
-    let (node, tokens) = match consume "return" tokens with 
-        | None -> expr tokens 
-        | Some tokens -> let (node, tokens) = expr tokens in (Node_Return node, tokens)
+    let node_return tokens = 
+        let (node, tokens) = expr tokens in 
+        let tokens = expect ";" tokens in
+        (Node_Return node, tokens)
     in
-    (node, expect ";" tokens)
+    let node_if tokens = 
+        let tokens = expect "(" tokens in
+        let (condition, tokens) = expr tokens in
+        let tokens = expect ")" tokens in
+        let (if_true, tokens) = stmt tokens in
+        let (if_false, tokens) = match consume "else" tokens with
+            | Some tokens -> stmt tokens
+            | None -> (Node_No_Op, tokens) in
+        (Node_If (condition, if_true, if_false), tokens)
+    in
+    match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
+    match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
+        let (node, tokens) = expr tokens in
+        (node, expect ";" tokens)
 and expr tokens = assign tokens
 and assign tokens =
     let (left, tokens) = equality tokens in
