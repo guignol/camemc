@@ -14,6 +14,7 @@ type node =
     | Node_If of node * node * node
     | Node_While of node * node
     | Node_For of node * node * node * node
+    | Node_Block of node list
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -126,10 +127,21 @@ let rec stmt tokens =
         let (execution, tokens) = stmt tokens in
         (Node_For (init, condition, iteration, execution), tokens)
     in
+	let node_block tokens =
+		let rec node_block_rec tokens list = match consume "}" tokens with
+		| Some tokens -> (list, tokens)
+		| None -> 
+			let (stmt, tokens) = stmt tokens in
+			node_block_rec tokens (list @ [stmt])
+		in
+		let (nodes, tokens) = node_block_rec tokens [] in
+		(Node_Block nodes, tokens)
+	in
     match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
     match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
     match consume "while" tokens with | Some tokens -> node_while tokens | None -> 
     match consume "for" tokens with | Some tokens -> node_for tokens | None -> 
+    match consume "{" tokens with | Some tokens -> node_block tokens | None -> 
         end_with ";" expr tokens
 and expr tokens = assign tokens
 and assign tokens =

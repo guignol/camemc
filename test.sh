@@ -12,9 +12,13 @@ assert() {
 	DIR="_compile"
 	mkdir -p ${DIR}
 	dune exec camer "--" "$input" >${DIR}/tmp.s
-	gcc -static -o ${DIR}/tmp ${DIR}/tmp.s
-	${DIR}/tmp
-	actual="$?"
+	if [ "$?" = "0" ]; then
+		gcc -static -o ${DIR}/tmp ${DIR}/tmp.s
+		${DIR}/tmp
+		actual="$?"
+	else
+		actual="failed"
+	fi
 
 	if [ "$actual" = "$expected" ]; then
 		echo "[$actual] $input"
@@ -24,6 +28,11 @@ assert() {
 		exit 1
 	fi
 }
+
+try 3 '{ return a = 3; }'
+try 2 '{ a = 3; return b = 2; }'
+try 6 '{ a = 3; b = 2; return c = 6; }'
+try 6 '{ a = 3; b = 2; return c = 6; return a + b + c; }'
 
 try 99 'a = 0; for (i = 0; i < 10; i = i + 1) a = a + 1; return 99;'
 try 10 'a = 0; for (i = 0; i < 10; i = i + 1) a = a + 1; return a;'

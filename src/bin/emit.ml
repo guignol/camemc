@@ -24,11 +24,13 @@ let load _ =
     print_string    "  mov rax, [rax]\n";
     print_string    "  push rax\n"
 
-let emit var_map nodes = 
+let emit var_map node = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
         | Ast.Node_No_Op -> 
             print_string	"  # no op\n"
+        | Ast.Node_Block nodes ->
+            List.iter emit_inner nodes
         | Ast.Node_For (init, condition, iteration, execution) ->
             let context = 333 in
             (* init *)
@@ -121,10 +123,19 @@ let emit var_map nodes =
             end;
             print_string   "  push rax\n"
     in
-    emit_inner nodes
+    emit_inner node
 
 let rec calculate_stack_offset stack m = function
     | Ast.Node_No_Op -> (stack, m)
+    | Ast.Node_Block nodes ->
+        let rec block stack m nodes =
+            match nodes with
+            | [] -> (stack, m)
+            | head :: tail -> 
+                let (stack, m) = calculate_stack_offset stack m head in
+                block stack m tail
+        in 
+        block stack m nodes
     | Ast.Node_For (init, condition, iteration, execution) ->
         let (stack, m) = calculate_stack_offset stack m init in
         let (stack, m) = calculate_stack_offset stack m condition in
