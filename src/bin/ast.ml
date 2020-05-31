@@ -15,6 +15,7 @@ type node =
     | Node_While of node * node
     | Node_For of node * node * node * node
     | Node_Block of node list
+    | Node_Call of string
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -77,20 +78,24 @@ let binary tokens next operators =
     recursive left tokens
 
 (*
-program    = stmt*
-stmt       = ("return")? expr ";"
+program		= stmt*
+stmt		= ("return")? expr ";"
         	| "{" stmt* "}"
 	        | "if" "(" expr ")" stmt ("else" stmt)?
 			| "while" "(" expr ")" stmt
         	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
-expr       = assign
-assign     = equality ("=" assign)?
-equality   = relational ("==" relational | "!=" relational)*
-relational = add ("<" add | "<=" add | ">" add | ">=" add)*
-add        = mul ("+" mul | "-" mul)*
-mul        = unary ("*" unary | "/" unary)*
-unary      = ("+" | "-")? primary
-primary    = num | identifier | "(" expr ")"
+expr		= assign
+assign		= equality ("=" assign)?
+equality	= relational ("==" relational | "!=" relational)*
+relational	= add ("<" add | "<=" add | ">" add | ">=" add)*
+add			= mul ("+" mul | "-" mul)*
+mul			= unary ("*" unary | "/" unary)*
+unary		= ("+" | "-")? primary
+primary		= num 
+			| identifier "(" args? ")"
+			| identifier 
+			| "(" expr ")"
+args		= expr ("," expr)*
 *)
 
 let rec stmt tokens =
@@ -127,16 +132,16 @@ let rec stmt tokens =
         let (execution, tokens) = stmt tokens in
         (Node_For (init, condition, iteration, execution), tokens)
     in
-	let node_block tokens =
-		let rec node_block_rec tokens list = match consume "}" tokens with
-		| Some tokens -> (list, tokens)
-		| None -> 
-			let (stmt, tokens) = stmt tokens in
-			node_block_rec tokens (list @ [stmt])
-		in
-		let (nodes, tokens) = node_block_rec tokens [] in
-		(Node_Block nodes, tokens)
-	in
+    let node_block tokens =
+        let rec node_block_rec tokens list = match consume "}" tokens with
+            | Some tokens -> (list, tokens)
+            | None -> 
+                let (stmt, tokens) = stmt tokens in
+                node_block_rec tokens (list @ [stmt])
+        in
+        let (nodes, tokens) = node_block_rec tokens [] in
+        (Node_Block nodes, tokens)
+    in
     match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
     match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
     match consume "while" tokens with | Some tokens -> node_while tokens | None -> 
@@ -166,8 +171,10 @@ and primary tokens = match consume "(" tokens with
     | Some tokens -> end_with ")" expr tokens
     | None -> 
         match consume_identifier tokens with
-        | Some (name, tokens) -> (Node_Variable name, tokens)
         | None -> expect_int tokens
+        | Some (name, tokens) -> match consume "(" tokens with 
+            | None -> (Node_Variable name, tokens)
+            | Some tokens -> (Node_Call name, expect ")" tokens) (* 引数なし *)
 
 let parse tokens =
     let rec program nodes = function

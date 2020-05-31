@@ -33,9 +33,9 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
-# try 12 'int b; b = 1; int a; a = foo() + b; return a;'
-# try 11 'return foo();'
-# try 12 'int a; return a = foo() + 1;'
+try 12 'int b; b = 1; int a; a = foo() + b; return a;'
+try 11 'return foo();'
+try 12 'int a; return a = foo() + 1;'
 # try 12 'int a; return a = bar(11) + 1;'
 # try 12 'int a; int b; b = 11; return a = bar(b) + 1;'
 # try 12 'int a; return a = hoge(11, 1);'

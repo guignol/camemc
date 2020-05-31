@@ -27,6 +27,9 @@ let load _ =
 let emit var_map node = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
+        | Ast.Node_Call name -> 
+            printf			"  call %s\n" name;
+            print_string	"  push rax\n"
         | Ast.Node_No_Op -> 
             print_string	"  # no op\n"
         | Ast.Node_Block nodes ->
@@ -127,6 +130,7 @@ let emit var_map node =
 
 let rec calculate_stack_offset stack m = function
     | Ast.Node_No_Op -> (stack, m)
+    | Ast.Node_Call _ -> (stack, m)
     | Ast.Node_Block nodes ->
         let rec block stack m nodes =
             match nodes with
