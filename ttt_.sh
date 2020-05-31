@@ -605,7 +605,6 @@ try 12 'return hoge(11, 1);'
 # exit 0
 
 try 3 '{ int aa; int b; aa = 3; { b = 2; } return aa; }'
-
 try 10 'int a; int b; int i; a = 0; b = 1; for (i = 0; i < 10; i = i + 1) { a = a + 1; b = a + 1; } return b - 1;'
 try 10 'int a; int b; int i; a = 0; b = 1; for (i = 0; i < 10; i = i + 1) { a = a + 1; b = a + 1; } return a;'
 try 10 'int value; int i; value = 0; for (i = 0; i < 10; i = i + 1) { value = value + 1; } return value;'

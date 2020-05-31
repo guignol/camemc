@@ -29,30 +29,35 @@ assert() {
 	fi
 }
 
-try 3 '{ return a = 3; }'
-try 2 '{ a = 3; return b = 2; }'
-try 6 '{ a = 3; b = 2; return c = 6; }'
-try 6 '{ a = 3; b = 2; return c = 6; return a + b + c; }'
+try 3 '{ int aa; int b; aa = 3; { b = 2; } return aa; }'
+try 10 'int a; int b; int i; a = 0; b = 1; for (i = 0; i < 10; i = i + 1) { a = a + 1; b = a + 1; } return b - 1;'
+try 10 'int a; int b; int i; a = 0; b = 1; for (i = 0; i < 10; i = i + 1) { a = a + 1; b = a + 1; } return a;'
+try 10 'int value; int i; value = 0; for (i = 0; i < 10; i = i + 1) { value = value + 1; } return value;'
 
-try 99 'a = 0; for (i = 0; i < 10; i = i + 1) a = a + 1; return 99;'
-try 10 'a = 0; for (i = 0; i < 10; i = i + 1) a = a + 1; return a;'
-try 10 'a = 0; while (a < 10) a = a + 1; return a;'
+try 3 '{ int a; return a = 3; }'
+try 2 '{ int a; int b; a = 3; return b = 2; }'
+try 6 '{ int a; int b; int c; a = 3; b = 2; return c = 6; }'
+try 6 '{ int a; int b; int c; a = 3; b = 2; return c = 6; return a + b + c; }'
 
-try 37 'a = 1983; b = 2020; if ((b - a) == 37) return 37; else return 36;'
-try 12 'a = 13; if (a == 0) return 3; else return 12;'
+try 99 'int a; a = 0; int i; for (i = 0; i < 10; i = i + 1) a = a + 1; return 99;'
+try 10 'int a; a = 0; int i; for (i = 0; i < 10; i = i + 1) a = a + 1; return a;'
+try 10 'int a; a = 0; while (a < 10) a = a + 1; return a;'
+
+try 37 'int a; int b; a = 1983; b = 2020; if ((b - a) == 37) return 37; else return 36;'
+try 12 'int a; a = 13; if (a == 0) return 3; else return 12;'
 try 12 'if (0) return 3; else return 12;'
-try 3 'if (10) return 3; return 12;'
 
-try 25 'a_3 = 12; _loc = 3; return a_3 * _loc - 11;'
-try 25 'a_3 = 12; _loc = 3; return a_3 * _loc - 11; 24;'
+try 25 'int a_3; int _loc; a_3 = 12; _loc = 3; return a_3 * _loc - 11;'
+try 25 'int a_3; int _loc; a_3 = 12; _loc = 3; return a_3 * _loc - 11; 24;'
 
-try 5 'aaa = 3; aaa + 2;'
-try 5 'aaa = 3; b29 = 2; b29 + aaa;'
-try 5 'O0 = 3; O0 = 2; O0 + 3;'
+try 5 'int aaa; aaa = 3; aaa + 2;'
+try 5 'int b29; int aaa; aaa = 3; b29 = 2; b29 + aaa;'
+try 5 'int O0; O0 = 3; O0 = 2; O0 + 3;'
 
-try 5 'a = 3; a + 2;'
-try 3 'a = 3; a;'
-# try 5 'a = 3; z = 2; return a + z;'
+try 5 'int a; a = 3; a + 2;'
+try 3 'int a; a = 3; a;'
+try 3 'return 3;'
+try 5 'int a; int z; a = 3; z = 2; return a + z;'
 
 try 5 '1 + 2 + 3 + 4; 5;'
 try 10 '1 + 2 + 3 + 4;'
