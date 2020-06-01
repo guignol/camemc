@@ -8,3 +8,8 @@ int bar(int a)
 {
 	return a;
 }
+
+int hoge(int a, int b)
+{
+	return a + b;
+}

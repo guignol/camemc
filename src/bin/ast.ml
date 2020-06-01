@@ -174,7 +174,19 @@ and primary tokens = match consume "(" tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
             | None -> (Node_Variable name, tokens)
-            | Some tokens -> (Node_Call (name, []), expect ")" tokens) (* 引数なし *)
+            | Some tokens -> 
+                match consume ")" tokens with 
+                | Some tokens -> (Node_Call (name, []), tokens)
+                | None -> 
+					let (arg, tokens) = expr tokens in
+                    let rec consume_args args tokens = match consume "," tokens with
+                        | None -> (Node_Call (name, args), expect ")" tokens)
+                        | Some tokens -> 
+                            let (arg, tokens) = expr tokens in
+                            let args = args @ [arg] in
+                            consume_args args tokens
+                    in
+                    consume_args [arg] tokens
 
 let parse tokens =
     let rec program nodes = function
