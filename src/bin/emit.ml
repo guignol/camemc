@@ -5,6 +5,13 @@ open Printf
 module StringMap = Map.Make(String)
 open StringMap
 
+let registers_64 = ["rdi";
+                    "rsi";
+                    "rdx";
+                    "rcx";
+                    "r8";
+                    "r9"]
+
 let emit_cmp op =
     print_string    "  cmp rax, rdi\n";
     printf          "  %s al\n" op;
@@ -27,9 +34,32 @@ let load _ =
 let emit var_map node = 
     let emit_address = emit_address var_map in
     let rec emit_inner = function
-        | Ast.Node_Call name -> 
-            printf			"  call %s\n" name;
-            print_string	"  push rax\n"
+        | Ast.Node_Call (name, args) -> 
+			List.iter emit_inner args;
+			let count = List.length args in
+			let pop i _ = 
+				let register = List.nth registers_64 (count - i - 1) in
+				printf		" pop %s\n" register
+			in
+			List.iteri pop args;
+            (* https://github.com/rui314/chibicc/commit/aedbf56c3af4914e3f183223ff879734683bec73 *)
+            (* We need to align RSP to a 16 byte boundary before *)
+            (* calling a function because it is an ABI requirement. *)
+            (* RAX is set to 0 for variadic function. *)
+            let context = 444 in
+            printf			"  mov rax, rsp\n";
+            printf			"  and rax, 0xF\n";		
+            printf			"  jnz .Lcall%d\n" context;		
+            printf			"  mov rax, 0\n";		
+            printf			"  call %s\n" name;		
+            printf			"  jmp .Lend%d\n" context;		
+            printf			".Lcall%d:\n" context;		
+            printf			"  sub rsp, 8\n";		
+            printf			"  mov rax, 0\n";		
+            printf			"  call %s\n" name;		
+            printf			"  add rsp, 8\n";		
+            printf			".Lend%d:\n" context;		
+            printf			"  push rax\n"
         | Ast.Node_No_Op -> 
             print_string	"  # no op\n"
         | Ast.Node_Block nodes ->
@@ -130,7 +160,15 @@ let emit var_map node =
 
 let rec calculate_stack_offset stack m = function
     | Ast.Node_No_Op -> (stack, m)
-    | Ast.Node_Call _ -> (stack, m)
+    | Ast.Node_Call (_, nodes) ->
+        let rec call stack m nodes =
+            match nodes with
+            | [] -> (stack, m)
+            | head :: tail -> 
+                let (stack, m) = calculate_stack_offset stack m head in
+                call stack m tail
+        in 
+        call stack m nodes
     | Ast.Node_Block nodes ->
         let rec block stack m nodes =
             match nodes with

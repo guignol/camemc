@@ -15,7 +15,7 @@ type node =
     | Node_While of node * node
     | Node_For of node * node * node * node
     | Node_Block of node list
-    | Node_Call of string
+    | Node_Call of string * node list
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -174,7 +174,7 @@ and primary tokens = match consume "(" tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
             | None -> (Node_Variable name, tokens)
-            | Some tokens -> (Node_Call name, expect ")" tokens) (* 引数なし *)
+            | Some tokens -> (Node_Call (name, []), expect ")" tokens) (* 引数なし *)
 
 let parse tokens =
     let rec program nodes = function
