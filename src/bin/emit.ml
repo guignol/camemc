@@ -158,86 +158,69 @@ let emit var_map node =
     in
     emit_inner node
 
-let rec calculate_stack_offset stack m = function
-    | Ast.Node_No_Op -> (stack, m)
-    | Ast.Node_Call (_, nodes) ->
-        let rec call stack m nodes =
-            match nodes with
-            | [] -> (stack, m)
-            | head :: tail -> 
-                let (stack, m) = calculate_stack_offset stack m head in
-                call stack m tail
-        in 
-        call stack m nodes
-    | Ast.Node_Block nodes ->
-        let rec block stack m nodes =
-            match nodes with
-            | [] -> (stack, m)
-            | head :: tail -> 
-                let (stack, m) = calculate_stack_offset stack m head in
-                block stack m tail
-        in 
-        block stack m nodes
-    | Ast.Node_For (init, condition, iteration, execution) ->
-        let (stack, m) = calculate_stack_offset stack m init in
-        let (stack, m) = calculate_stack_offset stack m condition in
-        let (stack, m) = calculate_stack_offset stack m iteration in
-        let (stack, m) = calculate_stack_offset stack m execution in
-        (stack, m)
-    | Ast.Node_While (condition, execution) ->
-        let (stack, m) = calculate_stack_offset stack m condition in
-        let (stack, m) = calculate_stack_offset stack m execution in
-        (stack, m)
-    | Ast.Node_If (condition, if_true, if_false) ->
-        let (stack, m) = calculate_stack_offset stack m condition in
-        let (stack, m) = calculate_stack_offset stack m if_true in
-        let (stack, m) = calculate_stack_offset stack m if_false in
-        (stack, m)
-    | Ast.Node_Return node -> calculate_stack_offset stack m node
-    | Ast.Node_Int _ -> (stack, m)
-    | Ast.Node_Variable name ->
-        begin
-            match (find_opt name m) with
-            | Some _ -> (stack, m)
-            | None ->
-                (* TODO 型ごとのサイズ *)
-                let size = 8 in
-                let offset = stack + size in
-                (offset, add name offset m)
-        end
-    | Ast.Node_Assign (left, right) -> 
-        let (stack, m) = calculate_stack_offset stack m left in
-        let (stack, m) = calculate_stack_offset stack m right in
-        (stack, m)
-    | Ast.Node_Binary (_, left, right) ->
-        let (stack, m) = calculate_stack_offset stack m left in
-        let (stack, m) = calculate_stack_offset stack m right in
-        (stack, m)
+let rec aggregate variables nodes = 
+    let rec from_one_node variables = function
+        | Ast.Node_Variable name -> name :: variables
+        | Ast.Node_No_Op -> variables
+        | Ast.Node_Call (_, nodes) -> aggregate variables nodes
+        | Ast.Node_Block nodes -> aggregate variables nodes
+        | Ast.Node_For (init, condition, iteration, execution) ->
+            aggregate variables [init; condition; iteration; execution]
+        | Ast.Node_While (condition, execution) ->
+            aggregate variables [condition; execution]
+        | Ast.Node_If (condition, if_true, if_false) ->
+            aggregate variables [condition; if_true; if_false]
+        | Ast.Node_Return node -> from_one_node variables node
+        | Ast.Node_Int _ -> variables
+        | Ast.Node_Assign (left, right) -> aggregate variables [left; right]
+        | Ast.Node_Binary (_, left, right) -> aggregate variables [left; right]
+    in
+    match nodes with | [] -> variables
+                     | head :: tail -> 
+                         aggregate (from_one_node variables head) tail
 
-let rec stack_offset stack m = function
+let rec calculate_stack_offset (stack, m) = function
     | [] -> (stack, m)
-    | node :: trees -> 
-        let (stack, m) = calculate_stack_offset stack m node in
-        stack_offset stack m trees
+    | name :: tail ->
+        calculate_stack_offset
+            begin
+                match (find_opt name m) with
+                | Some _ -> (stack, m)
+                | None ->
+                    (* TODO 型ごとのサイズ *)
+                    let size = 8 in
+                    let offset = stack + size in
+                    (offset, add name offset m)
+            end
+            tail
 
 let e globals = 
     print_string   ".intel_syntax noprefix\n";
     print_string   ".text\n";
-    let rec emit_function = function | [] -> () | global :: globals -> match global with
-        | Ast.Function (name, _, nodes) ->
+    let rec emit_globals = function | [] -> () | global :: globals -> match global with
+        | Ast.Function (name, args, nodes) ->
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
-            let (stack, var_map) = stack_offset 0 empty nodes in
+            let variables = aggregate [] nodes in
+            let (stack, var_map) = calculate_stack_offset (0, empty) (args @ variables) in
             (* プロローグ *)
             print_string	"  push rbp\n";
             print_string	"  mov rbp, rsp\n";
-            printf          "  sub rsp, %d\n" stack;
+            printf          "  sub rsp, %d # stack size\n" stack;
+            let stack_arg i name = 
+                let offset = find name var_map in
+                let register = List.nth registers_64 i in
+                printf	"  lea rax, [rbp - %d]\n" offset;
+                printf	"  mov QWORD PTR [rax], %s\n" register;
+                ()
+            in
+            List.iteri stack_arg args;
             List.iter (emit var_map) nodes;
             printf   		".Lreturn.%s:\n" name;
             (* エピローグ *)
             print_string	"  mov rsp, rbp\n";
             print_string	"  pop rbp\n";
             print_string	"  ret\n";
-            emit_function globals
+            emit_globals globals
     in
-    emit_function globals
+    emit_globals globals
