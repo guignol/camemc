@@ -35,13 +35,13 @@ let emit var_map node =
     let emit_address = emit_address var_map in
     let rec emit_inner = function
         | Ast.Node_Call (name, args) -> 
-			List.iter emit_inner args;
-			let count = List.length args in
-			let pop i _ = 
-				let register = List.nth registers_64 (count - i - 1) in
-				printf		" pop %s\n" register
-			in
-			List.iteri pop args;
+            List.iter emit_inner args;
+            let count = List.length args in
+            let pop i _ = 
+                let register = List.nth registers_64 (count - i - 1) in
+                printf		" pop %s\n" register
+            in
+            List.iteri pop args;
             (* https://github.com/rui314/chibicc/commit/aedbf56c3af4914e3f183223ff879734683bec73 *)
             (* We need to align RSP to a 16 byte boundary before *)
             (* calling a function because it is an ABI requirement. *)
@@ -220,19 +220,24 @@ let rec stack_offset stack m = function
         let (stack, m) = calculate_stack_offset stack m node in
         stack_offset stack m trees
 
-let e trees =
-    let (stack, var_map) = stack_offset 0 empty trees in
-    print_endline   ".intel_syntax noprefix";
-    print_endline   ".text";
-    print_endline   ".global main";
-    print_endline   "main:";
-    (* プロローグ *)
-    print_endline   "  push rbp";
-    print_endline   "  mov rbp, rsp";
-    printf          "  sub rsp, %d\n" stack;
-    List.iter (emit var_map) trees;
-    print_endline   ".Lreturn.main:";
-    (* エピローグ *)
-    print_endline   "  mov rsp, rbp";
-    print_endline   "  pop rbp";
-    print_endline   "  ret";
+let e globals = 
+    print_string   ".intel_syntax noprefix\n";
+    print_string   ".text\n";
+    let rec emit_function = function | [] -> () | global :: globals -> match global with
+        | Ast.Function (name, _, nodes) ->
+            printf   		".global %s\n" name;
+            printf   		"%s:\n" name;
+            let (stack, var_map) = stack_offset 0 empty nodes in
+            (* プロローグ *)
+            print_string	"  push rbp\n";
+            print_string	"  mov rbp, rsp\n";
+            printf          "  sub rsp, %d\n" stack;
+            List.iter (emit var_map) nodes;
+            printf   		".Lreturn.%s:\n" name;
+            (* エピローグ *)
+            print_string	"  mov rsp, rbp\n";
+            print_string	"  pop rbp\n";
+            print_string	"  ret\n";
+            emit_function globals
+    in
+    emit_function globals

@@ -1,8 +1,7 @@
 #!/bin/bash
 
 try() {
-	#	assert "$1" "int main() { return $2; }"
-	assert "$1" "$2"
+	assert "$1" "int main() { $2 }"
 }
 
 DIR="_compile"
@@ -32,6 +31,15 @@ assert() {
 }
 
 gcc -o ${DIR}/foo.s -S foo.c
+
+# assert 13 'int add(int a, int b) { hoge(a, b); return a + b; }int main() { return add(1, 12); }'
+# assert 13 'int add(int a, int b) { return a + b; } int main() { return add(1, 12); }'
+# assert 13 'int salut() { int a; int b; a = 1; b = 12; return 13; } int main() { return salut(); } '
+# assert 13 'int salut() { return 13; } int main() { return salut(); } '
+assert 13 'int main() { return bar(13); }'
+
+# try 13 'printf("moji: %i", 13); return 13;'
+# try 13 'int a; a = 13;  printf("moji: %i", 13); return a;'
 
 try 12 'int b; b = 1; int a; a = foo() + b; return a;'
 try 11 'return foo();'

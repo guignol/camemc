@@ -17,6 +17,12 @@ type node =
     | Node_Block of node list
     | Node_Call of string * node list
 
+type global = 
+    | Function of
+          (* name *) string * 
+                     (* args *) string list * 
+                     (* body *) node list
+
 let operation_of_string = function
     | "+" -> PLUS
     | "-" -> MINUS
@@ -76,6 +82,20 @@ let binary tokens next operators =
         consume_operator operators
     in
     recursive left tokens
+
+let consume_function name tokens arg_consumer = 
+    match consume ")" tokens with 
+    | Some tokens -> (name, [], tokens) (* 引数なし *)
+    | None -> (* 引数あり *)
+        let (arg, tokens) = arg_consumer tokens in
+        let rec consume_args args tokens = match consume "," tokens with
+            | None -> (name, args, expect ")" tokens)
+            | Some tokens -> 
+                let (arg, tokens) = arg_consumer tokens in
+                let args = args @ [arg] in
+                consume_args args tokens
+        in
+        consume_args [arg] tokens
 
 (*
 program		= stmt*
@@ -174,29 +194,38 @@ and primary tokens = match consume "(" tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
             | None -> (Node_Variable name, tokens)
-            | Some tokens -> 
-                match consume ")" tokens with 
-                | Some tokens -> (Node_Call (name, []), tokens)
-                | None -> 
-					let (arg, tokens) = expr tokens in
-                    let rec consume_args args tokens = match consume "," tokens with
-                        | None -> (Node_Call (name, args), expect ")" tokens)
-                        | Some tokens -> 
-                            let (arg, tokens) = expr tokens in
-                            let args = args @ [arg] in
-                            consume_args args tokens
-                    in
-                    consume_args [arg] tokens
+            | Some tokens -> (* 関数呼び出し *)
+                let (name, args, tokens) = consume_function name tokens expr in
+                (Node_Call (name, args), tokens)
+
+let function_body name args tokens =
+    let tokens = expect "{" tokens in
+    let rec body nodes tokens = match consume "}" tokens with
+        | Some tokens -> (Function (name, args, nodes), tokens)
+        | None ->
+            let (node, tokens) = stmt tokens in
+            body (nodes @ [node]) tokens
+    in
+    body [] tokens
+
+let function_definition tokens = 
+    let (name, tokens) = Option.get (consume_identifier tokens) in
+    let tokens = expect "(" tokens in
+    match consume ")" tokens with 
+    | Some tokens -> function_body name [] tokens
+    | None -> 
+        let consume_args tokens = Option.get (consume_identifier tokens) in
+        let (name, args, tokens) = consume_function name tokens consume_args in
+        function_body name args tokens
 
 let parse tokens =
-    let rec program nodes = function
-        | [] -> (nodes, [])
+    let rec parse_globals globals = function
+        | [] -> (globals, [])
         | tokens ->
-            let (new_root_node, tokens) = stmt tokens in
-            let nodes = nodes @ [new_root_node] in
-            program nodes tokens
+            let (f, tokens) = function_definition tokens in
+            parse_globals (globals @ [f]) tokens
     in
-    let (nodes, tokens) = program [] tokens in
+    let (globals, tokens) = parse_globals [] tokens in
     let () = if 0 < List.length tokens then
             (* 消費されなかったトークンがあれば出力される *)
             begin
@@ -205,4 +234,4 @@ let parse tokens =
                 print_endline ""
             end
     in
-    nodes
+    globals
