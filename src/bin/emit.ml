@@ -158,26 +158,28 @@ let emit var_map node =
     in
     emit_inner node
 
-let rec aggregate variables nodes = 
-    let rec from_one_node variables = function
-        | Ast.Node_Variable name -> name :: variables
-        | Ast.Node_No_Op -> variables
-        | Ast.Node_Call (_, nodes) -> aggregate variables nodes
-        | Ast.Node_Block nodes -> aggregate variables nodes
+let aggregate_variables vs nodes = 
+    let rec search_variables vs = function
+        | Ast.Node_Variable name -> name :: vs
+        | Ast.Node_No_Op -> vs
+        | Ast.Node_Call (_, nodes) -> aggregate vs nodes
+        | Ast.Node_Block nodes -> aggregate vs nodes
         | Ast.Node_For (init, condition, iteration, execution) ->
-            aggregate variables [init; condition; iteration; execution]
+            aggregate vs [init; condition; iteration; execution]
         | Ast.Node_While (condition, execution) ->
-            aggregate variables [condition; execution]
+            aggregate vs [condition; execution]
         | Ast.Node_If (condition, if_true, if_false) ->
-            aggregate variables [condition; if_true; if_false]
-        | Ast.Node_Return node -> from_one_node variables node
-        | Ast.Node_Int _ -> variables
-        | Ast.Node_Assign (left, right) -> aggregate variables [left; right]
-        | Ast.Node_Binary (_, left, right) -> aggregate variables [left; right]
+            aggregate vs [condition; if_true; if_false]
+        | Ast.Node_Return node -> search_variables vs node
+        | Ast.Node_Int _ -> vs
+        | Ast.Node_Assign (left, right) -> aggregate vs [left; right]
+        | Ast.Node_Binary (_, left, right) -> aggregate vs [left; right]
+    and aggregate vs = function 
+        | [] -> vs
+        | head :: tail -> 
+            aggregate (search_variables vs head) tail
     in
-    match nodes with | [] -> variables
-                     | head :: tail -> 
-                         aggregate (from_one_node variables head) tail
+    aggregate vs nodes
 
 let rec calculate_stack_offset (stack, m) = function
     | [] -> (stack, m)
@@ -195,27 +197,27 @@ let rec calculate_stack_offset (stack, m) = function
             tail
 
 let e globals = 
-    print_string   ".intel_syntax noprefix\n";
-    print_string   ".text\n";
+    print_string			".intel_syntax noprefix\n";
+    print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Ast.Function (name, args, nodes) ->
+        | Ast.Function (name, params, body) ->
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
-            let variables = aggregate [] nodes in
-            let (stack, var_map) = calculate_stack_offset (0, empty) (args @ variables) in
+            let variables = aggregate_variables params body in
+            let (stack, var_map) = calculate_stack_offset (0, empty) variables in
             (* プロローグ *)
             print_string	"  push rbp\n";
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
-            let stack_arg i name = 
+            let stack_params i name = 
                 let offset = find name var_map in
                 let register = List.nth registers_64 i in
-                printf	"  lea rax, [rbp - %d]\n" offset;
-                printf	"  mov QWORD PTR [rax], %s\n" register;
+                printf		"  lea rax, [rbp - %d]\n" offset;
+                printf		"  mov QWORD PTR [rax], %s\n" register;
                 ()
             in
-            List.iteri stack_arg args;
-            List.iter (emit var_map) nodes;
+            List.iteri stack_params params;
+            List.iter (emit var_map) body;
             printf   		".Lreturn.%s:\n" name;
             (* エピローグ *)
             print_string	"  mov rsp, rbp\n";

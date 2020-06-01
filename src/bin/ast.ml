@@ -18,10 +18,7 @@ type node =
     | Node_Call of string * node list
 
 type global = 
-    | Function of
-          (* name *) string * 
-                     (* args *) string list * 
-                     (* body *) node list
+    | Function of (* name *) string * (* params *) string list *  (* body *) node list
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -214,9 +211,9 @@ let function_definition tokens =
     match consume ")" tokens with 
     | Some tokens -> function_body name [] tokens
     | None -> 
-        let consume_args tokens = Option.get (consume_identifier tokens) in
-        let (name, args, tokens) = consume_function name tokens consume_args in
-        function_body name args tokens
+        let consume_params tokens = Option.get (consume_identifier tokens) in
+        let (name, params, tokens) = consume_function name tokens consume_params in
+        function_body name params tokens
 
 let parse tokens =
     let rec parse_globals globals = function
