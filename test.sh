@@ -32,7 +32,32 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
-# assert 13 'int add(int a, int b) { hoge(a, b); return a + b; } int main() { return add(1, 12); }'
+try 10 'int a; a = 0; int b; b = 1; int i; for (i = 0; i < 100; i = i + 1) { a = a + 1; b = a + 1; if (a == 10) return a; } return b - 1;'
+try 11 'int a; a = 3; int b; b = 2; int c; c = 6; return a + b + c; '
+try 11 'int a; int b; int c; { a = 3; b = 2; c = 6; return a + b + c; }'
+
+assert 1 "$(
+	cat <<END
+int fibonacci(int n) {
+	if (n == 0)	{
+		return 1;
+	} else if (n == 1) {
+		return 1;
+	}
+	return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+int main() {
+  int i;
+	for (i = 0; i < 10; i = i + 1) 	{
+		hoge(i, fibonacci(i));
+	}
+	return 1;
+}
+END
+)"
+
+assert 13 'int add(int a, int b) { hoge(a, b); return a + b; } int main() { return add(1, 12); }'
 assert 13 'int add(int a, int b) { return a + b; } int main() { return add(1, 12); }'
 assert 13 'int salut() { int a; int b; a = 1; b = 12; return 13; } int main() { return salut(); } '
 assert 13 'int salut() { return 13; } int main() { return salut(); } '

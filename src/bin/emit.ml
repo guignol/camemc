@@ -5,6 +5,8 @@ open Printf
 module StringMap = Map.Make(String)
 open StringMap
 
+let context = ref 0
+
 let registers_64 = ["rdi";
                     "rsi";
                     "rdx";
@@ -46,7 +48,7 @@ let emit var_map node =
             (* We need to align RSP to a 16 byte boundary before *)
             (* calling a function because it is an ABI requirement. *)
             (* RAX is set to 0 for variadic function. *)
-            let context = 444 in
+            let context = incr context; !context in
             printf			"  mov rax, rsp\n";
             printf			"  and rax, 0xF\n";		
             printf			"  jnz .Lcall%d\n" context;		
@@ -87,7 +89,7 @@ let emit var_map node =
             (* end *)
             printf			".Lbreak%d:\n" context
         | Ast.Node_While (condition, execution) ->
-            let context = 222 in
+            let context = incr context; !context in
             (* begin: *)
             printf			".Lcontinue%d:\n" context;
             (* condition *)
@@ -103,7 +105,7 @@ let emit var_map node =
             printf			".Lbreak%d:\n" context
 
         | Ast.Node_If (condition, if_true, if_false) ->
-            let context = 111 in
+            let context = incr context; !context in
             emit_inner condition;
             print_string    "  pop rax\n";
             print_string    "  cmp rax, 0\n";
