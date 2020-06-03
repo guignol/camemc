@@ -132,8 +132,9 @@ try 5 '1 + 2 + 3 + 4; 5;'
 try 10 '1 + 2 + 3 + 4;'
 try 10 '-1 + 2 + (14 - 3) - 1 * 2;'
 
-#try 0 "return 0;"
-#try 42 "return 42;"
+# try 0 '1 + aaa'
+try 0 "return 0;"
+try 42 "return 42;"
 try 42 "42;"
 try 42 "40+2;"
 try 0 '100-100;'

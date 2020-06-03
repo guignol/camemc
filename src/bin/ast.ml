@@ -4,12 +4,16 @@ open Printf
 type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
-type c_type = | TYPE_INT
+type c_type = | TYPE_INT | TYEP_POINTER of c_type
 
 type typed_name = {
     c_type: c_type;
     name: string
 }
+
+let declarations: typed_name list ref = ref []
+
+let find_declaration_by_name name = List.find_opt (fun t_n -> t_n.name = name) !declarations
 
 type node =
     | Node_No_Op
@@ -175,9 +179,16 @@ let rec stmt tokens =
         (Node_Block nodes, tokens)
     in
     let node_v_declaration tokens = (* TODO 変数宣言 *)
-        (* TODO ポインタのポインタ *)
-        let tokens = match consume "*" tokens with Some tokens -> tokens | None -> tokens in
-        let (_, tokens) = Option.get (consume_identifier tokens) in
+        let read_declaration c_type tokens = 
+            let (name, tokens) = Option.get (consume_identifier tokens) in
+            match find_declaration_by_name name with
+            | None -> declarations :=  { name = name; c_type = c_type } :: !declarations; tokens
+            | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
+        in
+        let tokens = match consume "*" tokens with
+            (* TODO ポインタのポインタ *)
+            | Some tokens -> read_declaration (TYEP_POINTER TYPE_INT) tokens
+            | None -> read_declaration TYPE_INT tokens in
         let tokens = expect ";" tokens in
         Node_No_Op, tokens
     in
@@ -215,19 +226,23 @@ and primary tokens = match consume "(" tokens with
         match consume_identifier tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
-            | None -> (Node_Variable { name = name; c_type = TYPE_INT }, tokens)
             | Some tokens -> (* 関数呼び出し *)
                 let (args, tokens) = consume_function tokens expr in
                 (Node_Call (name, args), tokens)
+            | None ->
+				match find_declaration_by_name name with
+				| Some d -> (Node_Variable d, tokens)
+				| None -> failwith ("variable " ^ name ^ " is not declared.")
 
-let function_body typed_name args tokens =
+let function_body typed_name params tokens =
     let tokens = expect "{" tokens in
     let rec body nodes tokens = match consume "}" tokens with
-        | Some tokens -> (Function (typed_name, args, nodes), tokens)
+        | Some tokens -> (Function (typed_name, params, nodes), tokens)
         | None ->
             let (node, tokens) = stmt tokens in
             body (nodes @ [node]) tokens
     in
+    declarations := params;
     body [] tokens
 
 let function_definition tokens = 
