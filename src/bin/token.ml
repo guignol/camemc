@@ -66,7 +66,7 @@ let tokenize reader =
                 match search_symbols ch ["=="; "!="; "<="; ">=";] with 
                 | Some (_, found) -> read_reserved 2 found | None ->
                     (* 1文字 *)
-                    match search_symbols ch ["="; ";"; "+"; "-"; "*"; "/"; "("; ")"; "<"; ">"; "{"; "}"; ","] with 
+                    match search_symbols ch ["="; ";"; "+"; "-"; "*"; "&"; "/"; "("; ")"; "<"; ">"; "{"; "}"; ","] with 
                     | Some (_, found) -> read_reserved 1 found | None ->
                         (* 数値 *)
                         let rec concat_number offset number = match reader (cursor + offset) with

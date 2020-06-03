@@ -32,6 +32,29 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
+# assert 4 "$(
+#   cat <<END
+# int main() {
+#   int x;
+#   int *y;
+#   x = 3;
+#   y = &x;
+#   *y = 4;
+#   return x;
+# }
+# END
+# )"
+
+assert 3 "$(
+  cat <<END
+int main() {
+	int x;
+	x = 3;
+	return *(&x);
+}
+END
+)"
+
 try 10 'int a; a = 0; int b; b = 1; int i; for (i = 0; i < 100; i = i + 1) { a = a + 1; b = a + 1; if (a == 10) return a; } return b - 1;'
 try 11 'int a; a = 3; int b; b = 2; int c; c = 6; return a + b + c; '
 try 11 'int a; int b; int c; { a = 3; b = 2; c = 6; return a + b + c; }'

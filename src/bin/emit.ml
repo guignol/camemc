@@ -19,14 +19,6 @@ let emit_cmp op =
     printf          "  %s al\n" op;
     print_string    "  movzb rax, al\n"
 
-let emit_address var_map = function
-    | Ast.Node_Variable name ->
-        let offset = find name var_map in
-        printf          "  # variable [%s]\n" name;
-        printf          "  lea rax, [rbp - %d]\n" offset;
-        print_string    "  push rax\n"
-    | _ -> failwith "This node can't emit address."
-
 let load _ =
     print_string    "  pop rax\n";
     (* 8byte == 64bit *)
@@ -34,8 +26,23 @@ let load _ =
     print_string    "  push rax\n"
 
 let emit var_map node = 
-    let emit_address = emit_address var_map in
-    let rec emit_inner = function
+    let rec emit_address = function
+        | Ast.Node_Variable name ->
+            let offset = find name var_map in
+            printf          "  # variable [%s]\n" name;
+            printf          "  lea rax, [rbp - %d]\n" offset;
+            print_string    "  push rax\n"
+        | Ast.Node_Deref node -> emit_inner node
+        | _ -> failwith "This node can't emit address."
+    and emit_inner = function
+        | Ast.Node_Address node -> 
+            (* 変数のアドレスをスタックに積むだけ *)
+            emit_address node
+        | Ast.Node_Deref node as deref ->
+            (* ポインタ変数の値（アドレス）をスタックに積む *)
+            emit_inner node;
+            (* それをロードする *)
+            load deref
         | Ast.Node_Call (name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
@@ -67,7 +74,7 @@ let emit var_map node =
         | Ast.Node_Block nodes ->
             List.iter emit_inner nodes
         | Ast.Node_For (init, condition, iteration, execution) ->
-            let context = 333 in
+            let context = incr context; !context in
             (* init *)
             emit_inner init;
             print_string	"  pop rax\n";
@@ -162,6 +169,8 @@ let emit var_map node =
 
 let aggregate_variables vs nodes = 
     let rec search_variables vs = function
+        | Ast.Node_Address node -> search_variables vs node
+        | Ast.Node_Deref node -> search_variables vs node
         | Ast.Node_Variable name -> name :: vs
         | Ast.Node_No_Op -> vs
         | Ast.Node_Call (_, nodes) -> aggregate vs nodes

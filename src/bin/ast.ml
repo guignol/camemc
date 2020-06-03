@@ -16,6 +16,8 @@ type node =
     | Node_For of node * node * node * node
     | Node_Block of node list
     | Node_Call of string * node list
+    | Node_Address of node
+    | Node_Deref of node
 
 type global = 
     | Function of (* name *) string * (* params *) string list *  (* body *) node list
@@ -108,6 +110,8 @@ relational	= add ("<" add | "<=" add | ">" add | ">=" add)*
 add			= mul ("+" mul | "-" mul)*
 mul			= unary ("*" unary | "/" unary)*
 unary		= ("+" | "-")? primary
+			| "*" unary
+			| "&" unary
 primary		= num 
 			| identifier "(" args? ")"
 			| identifier 
@@ -177,6 +181,8 @@ and add tokens =        binary tokens mul        ["+"; "-"]
 and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
+    match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Address n, t) | None ->
+    match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Deref n, t) | None ->
     match consume "+" tokens with Some tokens -> next tokens | None ->
     match consume "-" tokens with
     | Some tokens ->
@@ -190,7 +196,9 @@ and primary tokens = match consume "(" tokens with
         match consume_identifier tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
-            | None -> (Node_Variable name, tokens)
+            | None -> 
+                (* TODO intを無視してるせいで、int *y; を正しく扱えない *)
+                (Node_Variable name, tokens)
             | Some tokens -> (* 関数呼び出し *)
                 let (name, args, tokens) = consume_function name tokens expr in
                 (Node_Call (name, args), tokens)
