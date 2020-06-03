@@ -57,9 +57,9 @@ let tokenize reader =
             (* スペース *)
             if is_space ch then read_input (cursor + 1) tokens else
             (* TODO しばらく無視 *)
-            match search_keywords ch ["int"] with | Some (offset, _) -> read_input (cursor + offset) tokens | None ->
+            (* match search_keywords ch ["int"] with | Some (offset, _) -> read_input (cursor + offset) tokens | None -> *)
             (* Keyword *)
-            match search_keywords ch ["return"; "if"; "else"; "while"; "for"] with 
+            match search_keywords ch ["return"; "if"; "else"; "while"; "for"; "int"] with 
             | Some (offset, found) -> read_reserved offset found | None ->
                 (* 記号 *)
                 (* 2文字 *)

@@ -97,8 +97,10 @@ let consume_function name tokens arg_consumer =
         consume_args [arg] tokens
 
 (*
-program		= stmt*
+program		= function
+function   = decl_a "(" params? ")" { stmt* }
 stmt		= ("return")? expr ";"
+			| decl_a ";"
         	| "{" stmt* "}"
 	        | "if" "(" expr ")" stmt ("else" stmt)?
 			| "while" "(" expr ")" stmt
@@ -116,7 +118,9 @@ primary		= num
 			| identifier "(" args? ")"
 			| identifier 
 			| "(" expr ")"
+params		= decl_a ("," decl_a)*
 args		= expr ("," expr)*
+decl_a     = "int" "*"* identifier
 *)
 
 let rec stmt tokens =
@@ -163,11 +167,19 @@ let rec stmt tokens =
         let (nodes, tokens) = node_block_rec tokens [] in
         (Node_Block nodes, tokens)
     in
-    match consume "return" tokens with | Some tokens -> node_return tokens | None -> 
-    match consume "if" tokens with | Some tokens -> node_if tokens | None -> 
-    match consume "while" tokens with | Some tokens -> node_while tokens | None -> 
-    match consume "for" tokens with | Some tokens -> node_for tokens | None -> 
-    match consume "{" tokens with | Some tokens -> node_block tokens | None -> 
+    let node_v_declaration tokens = (* TODO 変数宣言 *)
+        (* TODO ポインタのポインタ *)
+        let tokens = match consume "*" tokens with Some tokens -> tokens | None -> tokens in
+        let (_, tokens) = Option.get (consume_identifier tokens) in
+        let tokens = expect ";" tokens in
+        Node_No_Op, tokens
+    in
+    match consume "return"	tokens with Some tokens -> node_return tokens | None -> 
+    match consume "if"		tokens with Some tokens -> node_if tokens | None -> 
+    match consume "while"	tokens with Some tokens -> node_while tokens | None -> 
+    match consume "for"		tokens with Some tokens -> node_for tokens | None -> 
+    match consume "{"		tokens with Some tokens -> node_block tokens | None -> 
+    match consume "int"		tokens with Some tokens -> node_v_declaration tokens | None ->
         end_with ";" expr tokens
 and expr tokens = assign tokens
 and assign tokens =
@@ -196,9 +208,7 @@ and primary tokens = match consume "(" tokens with
         match consume_identifier tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
-            | None -> 
-                (* TODO intを無視してるせいで、int *y; を正しく扱えない *)
-                (Node_Variable name, tokens)
+            | None -> (Node_Variable name, tokens)
             | Some tokens -> (* 関数呼び出し *)
                 let (name, args, tokens) = consume_function name tokens expr in
                 (Node_Call (name, args), tokens)
@@ -219,7 +229,10 @@ let function_definition tokens =
     match consume ")" tokens with 
     | Some tokens -> function_body name [] tokens
     | None -> 
-        let consume_params tokens = Option.get (consume_identifier tokens) in
+        let consume_params tokens = 
+            let tokens = expect "int" tokens in
+            Option.get (consume_identifier tokens)
+        in
         let (name, params, tokens) = consume_function name tokens consume_params in
         function_body name params tokens
 
@@ -227,6 +240,7 @@ let parse tokens =
     let rec parse_globals globals = function
         | [] -> (globals, [])
         | tokens ->
+            let tokens = expect "int" tokens in
             let (f, tokens) = function_definition tokens in
             parse_globals (globals @ [f]) tokens
     in

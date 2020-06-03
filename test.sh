@@ -32,18 +32,18 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
-# assert 4 "$(
-#   cat <<END
-# int main() {
-#   int x;
-#   int *y;
-#   x = 3;
-#   y = &x;
-#   *y = 4;
-#   return x;
-# }
-# END
-# )"
+assert 4 "$(
+  cat <<END
+int main() {
+  int x;
+  int *y;
+  x = 3;
+  y = &x;
+  *y = 4;
+  return x;
+}
+END
+)"
 
 assert 3 "$(
   cat <<END
