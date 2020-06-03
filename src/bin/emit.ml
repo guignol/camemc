@@ -27,7 +27,7 @@ let load _ =
 
 let emit var_map node = 
     let rec emit_address = function
-        | Ast.Node_Variable name ->
+        | Ast.Node_Variable { name; _ } ->
             let offset = find name var_map in
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
@@ -171,7 +171,7 @@ let aggregate_variables vs nodes =
     let rec search_variables vs = function
         | Ast.Node_Address node -> search_variables vs node
         | Ast.Node_Deref node -> search_variables vs node
-        | Ast.Node_Variable name -> name :: vs
+        | Ast.Node_Variable typed_name -> typed_name :: vs
         | Ast.Node_No_Op -> vs
         | Ast.Node_Call (_, nodes) -> aggregate vs nodes
         | Ast.Node_Block nodes -> aggregate vs nodes
@@ -194,7 +194,7 @@ let aggregate_variables vs nodes =
 
 let rec calculate_stack_offset (stack, m) = function
     | [] -> (stack, m)
-    | name :: tail ->
+    | { Ast.name = name; _} :: tail ->
         calculate_stack_offset
             begin
                 match (find_opt name m) with
@@ -211,7 +211,7 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Ast.Function (name, params, body) ->
+        | Ast.Function ({ name; _ }, params, body) ->
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
             let variables = aggregate_variables params body in
@@ -220,7 +220,8 @@ let e globals =
             print_string	"  push rbp\n";
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
-            let stack_params i name = 
+            let stack_params i typed_name = 
+				let { Ast.name; _} = typed_name in
                 let offset = find name var_map in
                 let register = List.nth registers_64 i in
                 printf		"  lea rax, [rbp - %d]\n" offset;

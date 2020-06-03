@@ -4,11 +4,18 @@ open Printf
 type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
+type c_type = | TYPE_INT
+
+type typed_name = {
+    c_type: c_type;
+    name: string
+}
+
 type node =
     | Node_No_Op
     | Node_Int of int
     | Node_Binary of operation * node * node
-    | Node_Variable of string
+    | Node_Variable of typed_name
     | Node_Assign of node * node
     | Node_Return of node
     | Node_If of node * node * node
@@ -20,7 +27,7 @@ type node =
     | Node_Deref of node
 
 type global = 
-    | Function of (* name *) string * (* params *) string list *  (* body *) node list
+    | Function of typed_name * typed_name list * node list
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -82,13 +89,13 @@ let binary tokens next operators =
     in
     recursive left tokens
 
-let consume_function name tokens arg_consumer = 
+let consume_function tokens arg_consumer = 
     match consume ")" tokens with 
-    | Some tokens -> (name, [], tokens) (* 引数なし *)
+    | Some tokens -> ([], tokens) (* 引数なし *)
     | None -> (* 引数あり *)
         let (arg, tokens) = arg_consumer tokens in
         let rec consume_args args tokens = match consume "," tokens with
-            | None -> (name, args, expect ")" tokens)
+            | None -> (args, expect ")" tokens)
             | Some tokens -> 
                 let (arg, tokens) = arg_consumer tokens in
                 let args = args @ [arg] in
@@ -208,15 +215,15 @@ and primary tokens = match consume "(" tokens with
         match consume_identifier tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
-            | None -> (Node_Variable name, tokens)
+            | None -> (Node_Variable { name = name; c_type = TYPE_INT }, tokens)
             | Some tokens -> (* 関数呼び出し *)
-                let (name, args, tokens) = consume_function name tokens expr in
+                let (args, tokens) = consume_function tokens expr in
                 (Node_Call (name, args), tokens)
 
-let function_body name args tokens =
+let function_body typed_name args tokens =
     let tokens = expect "{" tokens in
     let rec body nodes tokens = match consume "}" tokens with
-        | Some tokens -> (Function (name, args, nodes), tokens)
+        | Some tokens -> (Function (typed_name, args, nodes), tokens)
         | None ->
             let (node, tokens) = stmt tokens in
             body (nodes @ [node]) tokens
@@ -224,23 +231,25 @@ let function_body name args tokens =
     body [] tokens
 
 let function_definition tokens = 
+    let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
+    let typed_name = { c_type = TYPE_INT; name = name } in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
-    | Some tokens -> function_body name [] tokens
+    | Some tokens -> function_body typed_name [] tokens
     | None -> 
         let consume_params tokens = 
             let tokens = expect "int" tokens in
-            Option.get (consume_identifier tokens)
+            let (name, tokens) = Option.get (consume_identifier tokens) in
+            { c_type = TYPE_INT; name = name }, tokens
         in
-        let (name, params, tokens) = consume_function name tokens consume_params in
-        function_body name params tokens
+        let (params, tokens) = consume_function tokens consume_params in
+        function_body typed_name params tokens
 
 let parse tokens =
     let rec parse_globals globals = function
         | [] -> (globals, [])
         | tokens ->
-            let tokens = expect "int" tokens in
             let (f, tokens) = function_definition tokens in
             parse_globals (globals @ [f]) tokens
     in
