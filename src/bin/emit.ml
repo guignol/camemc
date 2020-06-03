@@ -1,10 +1,6 @@
 
 open Printf
 
-(* https://www.cs.cornell.edu/courses/cs3110/2018sp/l/08-functors/notes.html *)
-module StringMap = Map.Make(String)
-open StringMap
-
 let context = ref 0
 
 let registers_64 = ["rdi";
@@ -25,10 +21,9 @@ let load _ =
     print_string    "  mov rax, [rax]\n";
     print_string    "  push rax\n"
 
-let emit var_map node = 
+let emit node = 
     let rec emit_address = function
-        | Ast.Node_Variable { name; _ } ->
-            let offset = find name var_map in
+        | Ast.Node_Variable { variable = { name; _ }; offset; } ->
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
@@ -167,69 +162,26 @@ let emit var_map node =
     in
     emit_inner node
 
-let aggregate_variables vs nodes = 
-    let rec search_variables vs = function
-        | Ast.Node_Address node -> search_variables vs node
-        | Ast.Node_Deref node -> search_variables vs node
-        | Ast.Node_Variable typed_name -> typed_name :: vs
-        | Ast.Node_No_Op -> vs
-        | Ast.Node_Call (_, nodes) -> aggregate vs nodes
-        | Ast.Node_Block nodes -> aggregate vs nodes
-        | Ast.Node_For (init, condition, iteration, execution) ->
-            aggregate vs [init; condition; iteration; execution]
-        | Ast.Node_While (condition, execution) ->
-            aggregate vs [condition; execution]
-        | Ast.Node_If (condition, if_true, if_false) ->
-            aggregate vs [condition; if_true; if_false]
-        | Ast.Node_Return node -> search_variables vs node
-        | Ast.Node_Int _ -> vs
-        | Ast.Node_Assign (left, right) -> aggregate vs [left; right]
-        | Ast.Node_Binary (_, left, right) -> aggregate vs [left; right]
-    and aggregate vs = function 
-        | [] -> vs
-        | head :: tail -> 
-            aggregate (search_variables vs head) tail
-    in
-    aggregate vs nodes
-
-let rec calculate_stack_offset (stack, m) = function
-    | [] -> (stack, m)
-    | { Ast.name = name; _} :: tail ->
-        calculate_stack_offset
-            begin
-                match (find_opt name m) with
-                | Some _ -> (stack, m)
-                | None ->
-                    (* TODO 型ごとのサイズ *)
-                    let size = 8 in
-                    let offset = stack + size in
-                    (offset, add name offset m)
-            end
-            tail
-
 let e globals = 
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Ast.Function ({ name; _ }, params, body) ->
+        | Ast.Function ({ name; _ }, params, body, stack) ->
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
-            let variables = aggregate_variables params body in
-            let (stack, var_map) = calculate_stack_offset (0, empty) variables in
             (* プロローグ *)
             print_string	"  push rbp\n";
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
-            let stack_params i typed_name = 
-				let { Ast.name; _} = typed_name in
-                let offset = find name var_map in
+            let stack_params i decl = 
+                let offset = decl.Ast.offset in
                 let register = List.nth registers_64 i in
                 printf		"  lea rax, [rbp - %d]\n" offset;
                 printf		"  mov QWORD PTR [rax], %s\n" register;
                 ()
             in
             List.iteri stack_params params;
-            List.iter (emit var_map) body;
+            List.iter emit body;
             printf   		".Lreturn.%s:\n" name;
             (* エピローグ *)
             print_string	"  mov rsp, rbp\n";

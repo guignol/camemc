@@ -8,18 +8,19 @@ type c_type = | TYPE_INT | TYEP_POINTER of c_type
 
 type typed_name = {
     c_type: c_type;
-    name: string
+    name: string;
 }
 
-let declarations: typed_name list ref = ref []
-
-let find_declaration_by_name name = List.find_opt (fun t_n -> t_n.name = name) !declarations
+type variable_decl = {
+	variable: typed_name;
+	offset: int;
+}
 
 type node =
     | Node_No_Op
     | Node_Int of int
     | Node_Binary of operation * node * node
-    | Node_Variable of typed_name
+    | Node_Variable of variable_decl
     | Node_Assign of node * node
     | Node_Return of node
     | Node_If of node * node * node
@@ -31,7 +32,7 @@ type node =
     | Node_Deref of node
 
 type global = 
-    | Function of typed_name * typed_name list * node list
+    | Function of typed_name * variable_decl list * node list * (* stack *) int
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -107,6 +108,24 @@ let consume_function tokens arg_consumer =
         in
         consume_args [arg] tokens
 
+(* 変数宣言 *)
+let variables: variable_decl list ref = ref []
+let find_variables_by_name name = List.find_opt (fun { variable; _} -> variable.name = name) !variables
+let type_size = function
+    | TYPE_INT -> 8
+    | TYEP_POINTER _ -> 8
+let stack_size vs = match vs with [] -> 0 | { offset; _} :: _ -> offset
+let read_v_declaration c_type tokens = 
+    let (name, tokens) = Option.get (consume_identifier tokens) in
+    match find_variables_by_name name with
+    | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
+    | None -> 
+        let vs = !variables in
+        let offset = type_size c_type + stack_size vs in
+		let d = { variable = { name = name; c_type = c_type }; offset = offset } in
+        variables := d :: vs;
+        d, tokens
+
 (*
 program		= function
 function   = decl_a "(" params? ")" { stmt* }
@@ -178,17 +197,11 @@ let rec stmt tokens =
         let (nodes, tokens) = node_block_rec tokens [] in
         (Node_Block nodes, tokens)
     in
-    let node_v_declaration tokens = (* TODO 変数宣言 *)
-        let read_declaration c_type tokens = 
-            let (name, tokens) = Option.get (consume_identifier tokens) in
-            match find_declaration_by_name name with
-            | None -> declarations :=  { name = name; c_type = c_type } :: !declarations; tokens
-            | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
-        in
-        let tokens = match consume "*" tokens with
+    let node_v_declaration tokens = (* 変数宣言 *)
+        let (_, tokens) = match consume "*" tokens with
             (* TODO ポインタのポインタ *)
-            | Some tokens -> read_declaration (TYEP_POINTER TYPE_INT) tokens
-            | None -> read_declaration TYPE_INT tokens in
+            | Some tokens -> read_v_declaration (TYEP_POINTER TYPE_INT) tokens
+            | None -> read_v_declaration TYPE_INT tokens in
         let tokens = expect ";" tokens in
         Node_No_Op, tokens
     in
@@ -230,22 +243,23 @@ and primary tokens = match consume "(" tokens with
                 let (args, tokens) = consume_function tokens expr in
                 (Node_Call (name, args), tokens)
             | None ->
-				match find_declaration_by_name name with
-				| Some d -> (Node_Variable d, tokens)
-				| None -> failwith ("variable " ^ name ^ " is not declared.")
+                match find_variables_by_name name with
+                | Some d -> (Node_Variable d, tokens)
+                | None -> failwith ("variable " ^ name ^ " is not declared.")
 
 let function_body typed_name params tokens =
     let tokens = expect "{" tokens in
     let rec body nodes tokens = match consume "}" tokens with
-        | Some tokens -> (Function (typed_name, params, nodes), tokens)
-        | None ->
-            let (node, tokens) = stmt tokens in
-            body (nodes @ [node]) tokens
+        | None -> let (node, tokens) = stmt tokens in body (nodes @ [node]) tokens
+        | Some tokens -> 
+            let stack_size = stack_size !variables in
+            (* let stack_size = 256 in *)
+            (Function (typed_name, params, nodes, stack_size), tokens)
     in
-    declarations := params;
     body [] tokens
 
 let function_definition tokens = 
+	variables := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
     let typed_name = { c_type = TYPE_INT; name = name } in
@@ -255,8 +269,7 @@ let function_definition tokens =
     | None -> 
         let consume_params tokens = 
             let tokens = expect "int" tokens in
-            let (name, tokens) = Option.get (consume_identifier tokens) in
-            { c_type = TYPE_INT; name = name }, tokens
+			read_v_declaration TYPE_INT tokens
         in
         let (params, tokens) = consume_function tokens consume_params in
         function_body typed_name params tokens
