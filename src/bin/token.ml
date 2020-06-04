@@ -53,9 +53,21 @@ let tokenize reader =
         let read_identifier offset id = read_input (cursor + offset) (tokens @ [Identifier id]) in
         let search_keywords ch = List.find_map (equals ch (fun ch -> not (is_alnum ch))) in
         let search_symbols ch = List.find_map (equals ch (fun _ -> true)) in
+        let skip_comments ch = 
+            match equals ch (fun _ -> true) "//" with
+            | None -> None 
+            | Some (_, _) -> 
+                let rec search_line_break count =
+                    match reader (cursor + count) with
+                    | None -> count (* 末尾 *)
+                    | Some ch -> if ch = '\n' then count + 1 else search_line_break (count + 1)
+                in
+                Some (search_line_break 2)
+        in
         match reader cursor with None -> tokens | Some ch ->
             (* スペース *)
             if is_space ch then read_input (cursor + 1) tokens else
+			match skip_comments ch with Some offset -> read_input (cursor + offset) tokens | None ->
             (* Keyword *)
             match search_keywords ch ["return"; "if"; "else"; "while"; "for"; "int"] with 
             | Some (offset, found) -> read_reserved offset found | None ->

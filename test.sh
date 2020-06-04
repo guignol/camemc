@@ -32,21 +32,48 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   int *p;
+#   int *q;
+#   alloc_array_4(&p, 0, 1, 2, 3);
+#   // foo(*p);
+#   q = p + 3;
+#   return q - p;
+# }
+# END
+# )"
+
+# assert 2 "$(
+#   cat <<END
+# int main() {
+#   int *p;
+#   alloc_array_4(&p, 0, 1, 2, 3);
+#   foo(*p);
+#   p = p + 1;
+#   p = 1 + p;
+#   return *p;
+# }
+# END
+# )"
+
 assert 4 "$(
-  cat <<END
+	cat <<END
 int main() {
-  int x;
-  int *y;
-  x = 3;
-  y = &x;
-  *y = 4;
-  return x;
+	// コメント
+	int x;
+	int *y;
+	x = 3;
+	y = &x;
+	*y = 4;
+	return x;
 }
 END
 )"
 
 assert 3 "$(
-  cat <<END
+	cat <<END
 int main() {
 	int x;
 	x = 3;
