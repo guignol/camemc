@@ -6,14 +6,18 @@ type operation = PLUS | MINUS | MUL | DIV
 
 type c_type = | TYPE_INT | TYEP_POINTER of c_type
 
+let type_size = function
+    | TYPE_INT -> 8
+    | TYEP_POINTER _ -> 8
+
 type typed_name = {
     c_type: c_type;
     name: string;
 }
 
 type variable_decl = {
-	variable: typed_name;
-	offset: int;
+    variable: typed_name;
+    offset: int;
 }
 
 type node =
@@ -94,7 +98,7 @@ let binary tokens next operators =
     in
     recursive left tokens
 
-let consume_function tokens arg_consumer = 
+let function_params tokens arg_consumer = 
     match consume ")" tokens with 
     | Some tokens -> ([], tokens) (* 引数なし *)
     | None -> (* 引数あり *)
@@ -111,19 +115,15 @@ let consume_function tokens arg_consumer =
 (* 変数宣言 *)
 let variables: variable_decl list ref = ref []
 let find_variables_by_name name = List.find_opt (fun { variable; _} -> variable.name = name) !variables
-let type_size = function
-    | TYPE_INT -> 8
-    | TYEP_POINTER _ -> 8
-let stack_size vs = match vs with [] -> 0 | { offset; _} :: _ -> offset
+let stack_size () = match !variables with [] -> 0 | { offset; _} :: _ -> offset
 let read_v_declaration c_type tokens = 
     let (name, tokens) = Option.get (consume_identifier tokens) in
     match find_variables_by_name name with
     | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
     | None -> 
-        let vs = !variables in
-        let offset = type_size c_type + stack_size vs in
-		let d = { variable = { name = name; c_type = c_type }; offset = offset } in
-        variables := d :: vs;
+        let offset = type_size c_type + stack_size () in
+        let d = { variable = { name = name; c_type = c_type }; offset = offset } in
+        variables := d :: !variables;
         d, tokens
 
 (*
@@ -156,7 +156,7 @@ decl_a     = "int" "*"* identifier
 let rec stmt tokens =
     let node_return tokens = 
         let (node, tokens) = expr tokens in
-        (Node_Return node, expect ";" tokens)
+        Node_Return node, expect ";" tokens
     in
     let node_if tokens = 
         let tokens = expect "(" tokens in
@@ -165,13 +165,13 @@ let rec stmt tokens =
         let (if_false, tokens) = match consume "else" tokens with
             | Some tokens -> stmt tokens
             | None -> (Node_No_Op, tokens) in
-        (Node_If (condition, if_true, if_false), tokens)
+        Node_If (condition, if_true, if_false), tokens
     in
     let node_while tokens = 
         let tokens = expect "(" tokens in
         let (condition, tokens) = end_with ")" expr tokens in
         let (execution, tokens) = stmt tokens in
-        (Node_While (condition, execution), tokens)
+        Node_While (condition, execution), tokens
     in
     let node_for tokens =
         let tokens = expect "(" tokens in
@@ -185,7 +185,7 @@ let rec stmt tokens =
             | Some tokens -> (Node_Int 1, tokens) (* 反復式なし *)
             | None -> end_with ")" expr tokens in
         let (execution, tokens) = stmt tokens in
-        (Node_For (init, condition, iteration, execution), tokens)
+        Node_For (init, condition, iteration, execution), tokens
     in
     let node_block tokens =
         let rec node_block_rec tokens list = match consume "}" tokens with
@@ -195,15 +195,15 @@ let rec stmt tokens =
                 node_block_rec tokens (list @ [stmt])
         in
         let (nodes, tokens) = node_block_rec tokens [] in
-        (Node_Block nodes, tokens)
+        Node_Block nodes, tokens
     in
     let node_v_declaration tokens = (* 変数宣言 *)
+        (* TODO ポインタのポインタ *)
         let (_, tokens) = match consume "*" tokens with
-            (* TODO ポインタのポインタ *)
             | Some tokens -> read_v_declaration (TYEP_POINTER TYPE_INT) tokens
-            | None -> read_v_declaration TYPE_INT tokens in
-        let tokens = expect ";" tokens in
-        Node_No_Op, tokens
+            | None -> read_v_declaration TYPE_INT tokens
+        in
+        Node_No_Op, (expect ";" tokens)
     in
     match consume "return"	tokens with Some tokens -> node_return tokens | None -> 
     match consume "if"		tokens with Some tokens -> node_if tokens | None -> 
@@ -231,7 +231,7 @@ and unary tokens =
     | Some tokens ->
         let (right, tokens) = next tokens in
         (* -n = 0 - n *)
-        (Node_Binary (MINUS, Node_Int 0, right), tokens)
+        Node_Binary (MINUS, Node_Int 0, right), tokens
     | None -> next tokens
 and primary tokens = match consume "(" tokens with
     | Some tokens -> end_with ")" expr tokens
@@ -240,8 +240,8 @@ and primary tokens = match consume "(" tokens with
         | None -> expect_int tokens
         | Some (name, tokens) -> match consume "(" tokens with 
             | Some tokens -> (* 関数呼び出し *)
-                let (args, tokens) = consume_function tokens expr in
-                (Node_Call (name, args), tokens)
+                let (args, tokens) = function_params tokens expr in
+                Node_Call (name, args), tokens
             | None ->
                 match find_variables_by_name name with
                 | Some d -> (Node_Variable d, tokens)
@@ -252,14 +252,12 @@ let function_body typed_name params tokens =
     let rec body nodes tokens = match consume "}" tokens with
         | None -> let (node, tokens) = stmt tokens in body (nodes @ [node]) tokens
         | Some tokens -> 
-            let stack_size = stack_size !variables in
-            (* let stack_size = 256 in *)
-            (Function (typed_name, params, nodes, stack_size), tokens)
+            Function (typed_name, params, nodes, stack_size ()), tokens
     in
     body [] tokens
 
 let function_definition tokens = 
-	variables := [];
+    variables := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
     let typed_name = { c_type = TYPE_INT; name = name } in
@@ -267,11 +265,11 @@ let function_definition tokens =
     match consume ")" tokens with 
     | Some tokens -> function_body typed_name [] tokens
     | None -> 
-        let consume_params tokens = 
+        let with_params tokens = 
             let tokens = expect "int" tokens in
-			read_v_declaration TYPE_INT tokens
+            read_v_declaration TYPE_INT tokens
         in
-        let (params, tokens) = consume_function tokens consume_params in
+        let (params, tokens) = function_params tokens with_params in
         function_body typed_name params tokens
 
 let parse tokens =
