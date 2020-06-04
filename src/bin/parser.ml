@@ -54,13 +54,13 @@ let operation_of_string = function
 let consume str = function
     | [] -> None
     | head :: tail -> match head with
-        | Token.Reserved r when r = str -> Some tail
+        | Lexer.Reserved r when r = str -> Some tail
         | _ -> None
 
 let consume_identifier = function
     | [] -> None
     | head :: tail -> match head with
-        | Token.Identifier name -> Some (name, tail)
+        | Lexer.Identifier name -> Some (name, tail)
         | _ -> None
 
 let expect str tokens = 
@@ -68,7 +68,7 @@ let expect str tokens =
     with Invalid_argument _ ->
         let token_name = match tokens with
             | [] -> "none"
-            | t :: _ -> Token.debug_string_of_token t
+            | t :: _ -> Lexer.debug_string_of_token t
         in
         failwith (str ^ " is expected but " ^ token_name)
 
@@ -77,9 +77,9 @@ let end_with str parser tokens =
     (node, expect str tokens)
 
 let expect_int = function
-    | (Token.Number d) :: tokens -> (Node_Int d, tokens)
+    | (Lexer.Number d) :: tokens -> (Node_Int d, tokens)
     | [] -> failwith "tokens are exhausted"
-    | t :: _ -> failwith (Token.debug_string_of_token t ^ " is not int")
+    | t :: _ -> failwith (Lexer.debug_string_of_token t ^ " is not int")
 
 let binary tokens next operators =
     let (left, tokens) = next tokens in
@@ -284,7 +284,7 @@ let parse tokens =
             (* 消費されなかったトークンがあれば出力される *)
             begin
                 printf "# [remains] ";
-                List.iter Token.print_token tokens;
+                List.iter Lexer.print_token tokens;
                 print_endline ""
             end
     in

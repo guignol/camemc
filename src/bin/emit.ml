@@ -23,22 +23,22 @@ let load _ =
 
 let emit node = 
     let rec emit_address = function
-        | Ast.Node_Variable { variable = { name; _ }; offset; } ->
+        | Parser.Node_Variable { variable = { name; _ }; offset; } ->
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
-        | Ast.Node_Deref node -> emit_inner node
+        | Parser.Node_Deref node -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
-        | Ast.Node_Address node -> 
+        | Parser.Node_Address node -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
-        | Ast.Node_Deref node as deref ->
+        | Parser.Node_Deref node as deref ->
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
             load deref
-        | Ast.Node_Call (name, args) -> 
+        | Parser.Node_Call (name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
             let pop i _ = 
@@ -64,11 +64,11 @@ let emit node =
             printf			"  add rsp, 8\n";		
             printf			".Lend%d:\n" context;		
             printf			"  push rax\n"
-        | Ast.Node_No_Op -> 
+        | Parser.Node_No_Op -> 
             print_string	"  # no op\n"
-        | Ast.Node_Block nodes ->
+        | Parser.Node_Block nodes ->
             List.iter emit_inner nodes
-        | Ast.Node_For (init, condition, iteration, execution) ->
+        | Parser.Node_For (init, condition, iteration, execution) ->
             let context = incr context; !context in
             (* init *)
             emit_inner init;
@@ -90,7 +90,7 @@ let emit node =
             printf			"  jmp .Lcondition%d\n" context;
             (* end *)
             printf			".Lbreak%d:\n" context
-        | Ast.Node_While (condition, execution) ->
+        | Parser.Node_While (condition, execution) ->
             let context = incr context; !context in
             (* begin: *)
             printf			".Lcontinue%d:\n" context;
@@ -106,7 +106,7 @@ let emit node =
             (* end: *)
             printf			".Lbreak%d:\n" context
 
-        | Ast.Node_If (condition, if_true, if_false) ->
+        | Parser.Node_If (condition, if_true, if_false) ->
             let context = incr context; !context in
             emit_inner condition;
             print_string    "  pop rax\n";
@@ -117,24 +117,24 @@ let emit node =
             printf		    ".Lelse%d:\n" context;
             emit_inner if_false;
             printf    		".Lend%d:\n" context
-        | Ast.Node_Return node -> 
+        | Parser.Node_Return node -> 
             emit_inner node;
             print_string	"  jmp .Lreturn.main\n"
-        | Ast.Node_Variable _ as v ->
+        | Parser.Node_Variable _ as v ->
             emit_address v;
             load v
-        | Ast.Node_Assign (left, right) ->
+        | Parser.Node_Assign (left, right) ->
             emit_address left;
             emit_inner right;
             print_string    "  pop rax\n";
             print_string    "  pop rdi\n";
             print_string    "  mov QWORD PTR [rdi], rax\n";
             print_string    "  push rax\n"
-        | Ast.Node_Int d ->
+        | Parser.Node_Int d ->
             printf  "  push %d\n" d;
             (* TODO returnの代替 *)
             printf  "  mov rax, %d\n" d
-        | Ast.Node_Binary (op, left, right) ->
+        | Parser.Node_Binary (op, left, right) ->
             emit_inner left;
             emit_inner right;
             print_string    "  pop rdi\n";
@@ -166,7 +166,7 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Ast.Function ({ name; _ }, params, body, stack) ->
+        | Parser.Function ({ name; _ }, params, body, stack) ->
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
             (* プロローグ *)
@@ -174,7 +174,7 @@ let e globals =
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
             let stack_params i decl = 
-                let offset = decl.Ast.offset in
+                let offset = decl.Parser.offset in
                 let register = List.nth registers_64 i in
                 printf		"  lea rax, [rbp - %d]\n" offset;
                 printf		"  mov QWORD PTR [rax], %s\n" register;
