@@ -4,11 +4,11 @@ open Printf
 type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
-type c_type = | TYPE_INT | TYEP_POINTER of c_type
+type c_type = | TYPE_INT | TYPE_POINTER of c_type
 
 let type_size = function
-    | TYPE_INT -> 8
-    | TYEP_POINTER _ -> 8
+    | TYPE_INT -> 4
+    | TYPE_POINTER _ -> 8
 
 type typed_name = {
     c_type: c_type;
@@ -200,7 +200,7 @@ let rec stmt tokens =
     let node_v_declaration tokens = (* 変数宣言 *)
         (* TODO ポインタのポインタ *)
         let (_, tokens) = match consume "*" tokens with
-            | Some tokens -> read_v_declaration (TYEP_POINTER TYPE_INT) tokens
+            | Some tokens -> read_v_declaration (TYPE_POINTER TYPE_INT) tokens
             | None -> read_v_declaration TYPE_INT tokens
         in
         Node_No_Op, (expect ";" tokens)
@@ -217,7 +217,7 @@ and assign tokens =
     let (left, tokens) = equality tokens in
     match consume "=" tokens with None -> (left, tokens) | Some tokens ->
         let (right, tokens) = assign tokens in (* 代入は右結合 *)
-        (Node_Assign (left, right), tokens)
+        Node_Assign (left, right), tokens
 and equality tokens =   binary tokens relational ["=="; "!="]
 and relational tokens = binary tokens add        ["<"; "<="; ">"; ">="]
 and add tokens =        binary tokens mul        ["+"; "-"]

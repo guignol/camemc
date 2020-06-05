@@ -9,36 +9,74 @@ let registers_64 = ["rdi";
                     "rcx";
                     "r8";
                     "r9"]
+let registers_32 = ["edi";
+                    "esi";
+                    "edx";
+                    "ecx";
+                    "r8d";
+                    "r9d"]
+let registers_8 = ["DIL";
+                   "SIL";
+                   "DL";
+                   "CL";
+                   "R8B";
+                   "R9B"]
+
+let size_prefix = function
+    | 1 -> "BYTE PTR"	(* 1byte == 8bit *)
+    | 4 -> "DWORD PTR"	(* 4byte == 32bit *)
+    | 8 -> "QWORD PTR"	(* 8byte == 64bit *)
+    | size -> failwith (sprintf "[size_prefix]%d bit regsiter is not supported" (size * 8))
+let register_name_rax = function
+    | 1 -> "al"		(* 1byte == 8bit *)
+    | 4 -> "eax"	(* 4byte == 32bit *)
+    | 8 -> "rax"	(* 8byte == 64bit *)
+    | size -> failwith (sprintf "[register_name_rax]%d bit regsiter is not supported" (size * 8))
+let register_name_for_parameter index = function
+    | 1 -> List.nth registers_8 index	(* 1byte == 8bit *)
+    | 4 -> List.nth registers_32 index	(* 4byte == 32bit *)
+    | 8 -> List.nth registers_64 index	(* 8byte == 64bit *)
+    | size -> failwith (sprintf "[register_name_for_parameter]%d bit regsiter is not supported" (size * 8))
 
 let emit_cmp op =
     print_string    "  cmp rax, rdi\n";
     printf          "  %s al\n" op;
     print_string    "  movzb rax, al\n"
 
-let load _ =
+let load c_type =
     print_string    "  pop rax\n";
-    (* 8byte == 64bit *)
-    print_string    "  mov rax, [rax]\n";
+    let size = Typing.type_size c_type in
+    let prefix = size_prefix size in
+    let _ = match size with
+        | 1 -> (* 1byte == 8bit *)
+            printf			"  movsx rax, %s [rax]\n" prefix
+        | 4 -> (* 4byte == 32bit *)
+            (* 負の値がcmpでゼロ埋め拡張されないように、符号拡張する *)
+            printf			"  movsxd rax, %s [rax]\n" prefix
+        | 8-> (* 8byte == 64bit *)
+            print_string	"  mov rax, [rax]\n"
+        | _ -> failwith ""
+    in
     print_string    "  push rax\n"
 
 let emit node = 
     let rec emit_address = function
-        | Parser.Node_Variable { variable = { name; _ }; offset; } ->
+        | Typing.Node_Variable (_, name, offset) ->
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
-        | Parser.Node_Deref node -> emit_inner node
+        | Typing.Node_Deref (_, node) -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
-        | Parser.Node_Address node -> 
+        | Typing.Node_Address (_, node) -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
-        | Parser.Node_Deref node as deref ->
+        | Typing.Node_Deref (c_type, node) ->
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
-            load deref
-        | Parser.Node_Call (name, args) -> 
+            load c_type
+        | Typing.Node_Call (_, name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
             let pop i _ = 
@@ -64,11 +102,11 @@ let emit node =
             printf			"  add rsp, 8\n";		
             printf			".Lend%d:\n" context;		
             printf			"  push rax\n"
-        | Parser.Node_No_Op -> 
+        | Typing.Node_No_Op -> 
             print_string	"  # no op\n"
-        | Parser.Node_Block nodes ->
+        | Typing.Node_Block nodes ->
             List.iter emit_inner nodes
-        | Parser.Node_For (init, condition, iteration, execution) ->
+        | Typing.Node_For (init, condition, iteration, execution) ->
             let context = incr context; !context in
             (* init *)
             emit_inner init;
@@ -90,7 +128,7 @@ let emit node =
             printf			"  jmp .Lcondition%d\n" context;
             (* end *)
             printf			".Lbreak%d:\n" context
-        | Parser.Node_While (condition, execution) ->
+        | Typing.Node_While (condition, execution) ->
             let context = incr context; !context in
             (* begin: *)
             printf			".Lcontinue%d:\n" context;
@@ -106,7 +144,7 @@ let emit node =
             (* end: *)
             printf			".Lbreak%d:\n" context
 
-        | Parser.Node_If (condition, if_true, if_false) ->
+        | Typing.Node_If (condition, if_true, if_false) ->
             let context = incr context; !context in
             emit_inner condition;
             print_string    "  pop rax\n";
@@ -117,24 +155,27 @@ let emit node =
             printf		    ".Lelse%d:\n" context;
             emit_inner if_false;
             printf    		".Lend%d:\n" context
-        | Parser.Node_Return node -> 
+        | Typing.Node_Return (_, node) -> 
             emit_inner node;
             print_string	"  jmp .Lreturn.main\n"
-        | Parser.Node_Variable _ as v ->
+        | Typing.Node_Variable (c_type, _, _) as v ->
             emit_address v;
-            load v
-        | Parser.Node_Assign (left, right) ->
+            load c_type
+        | Typing.Node_Assign (c_type, left, right) ->
             emit_address left;
             emit_inner right;
+            let size = Typing.type_size c_type in
+            let prefix = size_prefix size in
+			let register_name = register_name_rax size in
             print_string    "  pop rax\n";
             print_string    "  pop rdi\n";
-            print_string    "  mov QWORD PTR [rdi], rax\n";
+            printf			"  mov %s [rdi], %s\n" prefix register_name;
             print_string    "  push rax\n"
-        | Parser.Node_Int d ->
+        | Typing.Node_Int (_, d) ->
             printf  "  push %d\n" d;
             (* TODO returnの代替 *)
             printf  "  mov rax, %d\n" d
-        | Parser.Node_Binary (op, left, right) ->
+        | Typing.Node_Binary (_, op, left, right) ->
             emit_inner left;
             emit_inner right;
             print_string    "  pop rdi\n";
@@ -166,18 +207,20 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Parser.Function ({ name; _ }, params, body, stack) ->
+        | Typing.Function (_, name, params, body, stack) ->
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
             (* プロローグ *)
             print_string	"  push rbp\n";
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
-            let stack_params i decl = 
+            let stack_params i decl =
                 let offset = decl.Parser.offset in
-                let register = List.nth registers_64 i in
+				let size = Parser.type_size decl.Parser.variable.Parser.c_type in
+				let prefix = size_prefix size in
+                let register = register_name_for_parameter i size in
                 printf		"  lea rax, [rbp - %d]\n" offset;
-                printf		"  mov QWORD PTR [rax], %s\n" register;
+                printf		"  mov %s [rax], %s\n" prefix register;
                 ()
             in
             List.iteri stack_params params;
