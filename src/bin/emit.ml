@@ -1,6 +1,6 @@
 
 open Printf
-open Typing
+open Untyped
 
 let context = ref 0
 
@@ -44,9 +44,8 @@ let emit_cmp op =
     printf          "  %s al\n" op;
     print_string    "  movzb rax, al\n"
 
-let load c_type =
+let load size =
     print_string    "  pop rax\n";
-    let size = Type.size c_type in
     let prefix = size_prefix size in
     let _ = match size with
         | 1 -> (* 1byte == 8bit *)
@@ -69,15 +68,15 @@ let emit node =
         | Node_Deref (_, node) -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
-        | Node_Address (_, node) -> 
+        | Node_Address node -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
-        | Node_Deref (c_type, node) ->
+        | Node_Deref (size, node) ->
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
-            load c_type
-        | Node_Call (_, name, args) -> 
+            load size
+        | Node_Call (name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
             let pop i _ = 
@@ -156,27 +155,26 @@ let emit node =
             printf		    ".Lelse%d:\n" context;
             emit_inner if_false;
             printf    		".Lend%d:\n" context
-        | Node_Return (_, node) -> 
+        | Node_Return node -> 
             emit_inner node;
             print_string	"  jmp .Lreturn.main\n"
-        | Node_Variable (c_type, _, _) as v ->
+        | Node_Variable (size, _, _) as v ->
             emit_address v;
-            load c_type
-        | Node_Assign (c_type, left, right) ->
+            load size
+        | Node_Assign (size, left, right) ->
             emit_address left;
             emit_inner right;
-            let size = Type.size c_type in
             let prefix = size_prefix size in
 			let register_name = register_name_rax size in
             print_string    "  pop rax\n";
             print_string    "  pop rdi\n";
             printf			"  mov %s [rdi], %s\n" prefix register_name;
             print_string    "  push rax\n"
-        | Node_Int (_, d) ->
+        | Node_Int d ->
             printf  "  push %d\n" d;
             (* TODO returnの代替 *)
             printf  "  mov rax, %d\n" d
-        | Node_Binary (_, op, left, right) ->
+        | Node_Binary (op, left, right) ->
             emit_inner left;
             emit_inner right;
             print_string    "  pop rdi\n";
@@ -208,7 +206,7 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Function (_, name, params, body, stack) ->
+        | Function (name, params, body, stack) ->
 			let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
 			let stack = adjust stack in
             printf   		".global %s\n" name;

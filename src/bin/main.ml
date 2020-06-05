@@ -7,6 +7,7 @@ let () =
     let input = Sys.argv.(1) in
     let reader index = try Some input.[index] with _ -> None in
     Emit.e
-        (Typing.typed 
-             (Parser.parse
-                  (Lexer.tokenize reader)))
+        (Untyped.untyped
+             (Typed.typed 
+                  (Parser.parse
+                       (Lexer.tokenize reader))))
