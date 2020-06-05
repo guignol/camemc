@@ -1,5 +1,6 @@
 
 open Printf
+open Typing
 
 let context = ref 0
 
@@ -45,7 +46,7 @@ let emit_cmp op =
 
 let load c_type =
     print_string    "  pop rax\n";
-    let size = Typing.type_size c_type in
+    let size = Type.size c_type in
     let prefix = size_prefix size in
     let _ = match size with
         | 1 -> (* 1byte == 8bit *)
@@ -61,27 +62,27 @@ let load c_type =
 
 let emit node = 
     let rec emit_address = function
-        | Typing.Node_Variable (_, name, offset) ->
+        | Node_Variable (_, name, offset) ->
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
-        | Typing.Node_Deref (_, node) -> emit_inner node
+        | Node_Deref (_, node) -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
-        | Typing.Node_Address (_, node) -> 
+        | Node_Address (_, node) -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
-        | Typing.Node_Deref (c_type, node) ->
+        | Node_Deref (c_type, node) ->
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
             load c_type
-        | Typing.Node_Call (_, name, args) -> 
+        | Node_Call (_, name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
             let pop i _ = 
                 let register = List.nth registers_64 (count - i - 1) in
-                printf		" pop %s\n" register
+                printf		"  pop %s\n" register
             in
             List.iteri pop args;
             (* https://github.com/rui314/chibicc/commit/aedbf56c3af4914e3f183223ff879734683bec73 *)
@@ -102,11 +103,11 @@ let emit node =
             printf			"  add rsp, 8\n";		
             printf			".Lend%d:\n" context;		
             printf			"  push rax\n"
-        | Typing.Node_No_Op -> 
+        | Node_No_Op -> 
             print_string	"  # no op\n"
-        | Typing.Node_Block nodes ->
+        | Node_Block nodes ->
             List.iter emit_inner nodes
-        | Typing.Node_For (init, condition, iteration, execution) ->
+        | Node_For (init, condition, iteration, execution) ->
             let context = incr context; !context in
             (* init *)
             emit_inner init;
@@ -128,7 +129,7 @@ let emit node =
             printf			"  jmp .Lcondition%d\n" context;
             (* end *)
             printf			".Lbreak%d:\n" context
-        | Typing.Node_While (condition, execution) ->
+        | Node_While (condition, execution) ->
             let context = incr context; !context in
             (* begin: *)
             printf			".Lcontinue%d:\n" context;
@@ -144,7 +145,7 @@ let emit node =
             (* end: *)
             printf			".Lbreak%d:\n" context
 
-        | Typing.Node_If (condition, if_true, if_false) ->
+        | Node_If (condition, if_true, if_false) ->
             let context = incr context; !context in
             emit_inner condition;
             print_string    "  pop rax\n";
@@ -155,27 +156,27 @@ let emit node =
             printf		    ".Lelse%d:\n" context;
             emit_inner if_false;
             printf    		".Lend%d:\n" context
-        | Typing.Node_Return (_, node) -> 
+        | Node_Return (_, node) -> 
             emit_inner node;
             print_string	"  jmp .Lreturn.main\n"
-        | Typing.Node_Variable (c_type, _, _) as v ->
+        | Node_Variable (c_type, _, _) as v ->
             emit_address v;
             load c_type
-        | Typing.Node_Assign (c_type, left, right) ->
+        | Node_Assign (c_type, left, right) ->
             emit_address left;
             emit_inner right;
-            let size = Typing.type_size c_type in
+            let size = Type.size c_type in
             let prefix = size_prefix size in
 			let register_name = register_name_rax size in
             print_string    "  pop rax\n";
             print_string    "  pop rdi\n";
             printf			"  mov %s [rdi], %s\n" prefix register_name;
             print_string    "  push rax\n"
-        | Typing.Node_Int (_, d) ->
+        | Node_Int (_, d) ->
             printf  "  push %d\n" d;
             (* TODO returnの代替 *)
             printf  "  mov rax, %d\n" d
-        | Typing.Node_Binary (_, op, left, right) ->
+        | Node_Binary (_, op, left, right) ->
             emit_inner left;
             emit_inner right;
             print_string    "  pop rdi\n";
@@ -207,19 +208,19 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Typing.Function (_, name, params, body, stack) ->
+        | Function (_, name, params, body, stack) ->
+			let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
+			let stack = adjust stack in
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
             (* プロローグ *)
             print_string	"  push rbp\n";
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
-            let stack_params i decl =
-                let offset = decl.Parser.offset in
-				let size = Parser.type_size decl.Parser.variable.Parser.c_type in
-				let prefix = size_prefix size in
-                let register = register_name_for_parameter i size in
-                printf		"  lea rax, [rbp - %d]\n" offset;
+            let stack_params i param =
+				let prefix = size_prefix param.size in
+                let register = register_name_for_parameter i param.size in
+                printf		"  lea rax, [rbp - %d]\n" param.offset;
                 printf		"  mov %s [rax], %s\n" prefix register;
                 ()
             in

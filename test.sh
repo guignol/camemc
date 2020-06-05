@@ -14,7 +14,7 @@ assert() {
 	dune exec camer "--" "$input" >${DIR}/tmp.s
 	if [ "$?" = "0" ]; then
 		gcc -static -o ${DIR}/tmp ${DIR}/tmp.s ${DIR}/foo.s
-		# gcc -static -o ${DIR}/tmp ${DIR}/tmp.s
+		# DIR="_compile"; gcc -static -o ${DIR}/tmp ${DIR}/tmp.s && ${DIR}/tmp
 		${DIR}/tmp
 		actual="$?"
 	else
@@ -109,7 +109,7 @@ END
 
 assert 13 'int add(int a, int b) { hoge(a, b); return a + b; } int main() { return add(1, 12); }'
 assert 13 'int add(int a, int b) { return a + b; } int main() { return add(1, 12); }'
-assert 13 'int salut() { int a; int b; a = 1; b = 12; return 13; } int main() { return salut(); } '
+assert 13 'int salut() { int a; int b; a = 1; b = 12; return 13; } int main() { return salut(); }'
 assert 13 'int salut() { return 13; } int main() { return salut(); } '
 assert 13 'int main() { return bar(13); }'
 

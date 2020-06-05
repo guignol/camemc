@@ -4,27 +4,11 @@ open Printf
 type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
-type c_type = | TYPE_INT | TYPE_POINTER of c_type
-
-let type_size = function
-    | TYPE_INT -> 4
-    | TYPE_POINTER _ -> 8
-
-type typed_name = {
-    c_type: c_type;
-    name: string;
-}
-
-type variable_decl = {
-    variable: typed_name;
-    offset: int;
-}
-
 type node =
     | Node_No_Op
     | Node_Int of int
     | Node_Binary of operation * node * node
-    | Node_Variable of variable_decl
+    | Node_Variable of Type.typed_name * int
     | Node_Assign of node * node
     | Node_Return of node
     | Node_If of node * node * node
@@ -36,7 +20,7 @@ type node =
     | Node_Deref of node
 
 type global = 
-    | Function of typed_name * variable_decl list * node list * (* stack *) int
+    | Function of Type.typed_name * Type.typed_name list * node list * Type.typed_name list
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -113,17 +97,23 @@ let function_params tokens arg_consumer =
         consume_args [arg] tokens
 
 (* 変数宣言 *)
-let variables: variable_decl list ref = ref []
-let find_variables_by_name name = List.find_opt (fun { variable; _} -> variable.name = name) !variables
-let stack_size () = match !variables with [] -> 0 | { offset; _} :: _ -> offset
-let read_v_declaration c_type tokens = 
+let locals: Type.typed_name list ref = ref []
+let find_variables_by_name name =
+	let rec find index = function
+		| [] -> None
+		| head :: tail -> 
+		if head.Type.name = name 
+		then Some (head, index)
+		else find (index + 1) tail
+	in
+	find 0 !locals
+let add_declaration c_type tokens = 
     let (name, tokens) = Option.get (consume_identifier tokens) in
     match find_variables_by_name name with
     | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
-    | None -> 
-        let offset = type_size c_type + stack_size () in
-        let d = { variable = { name = name; c_type = c_type }; offset = offset } in
-        variables := d :: !variables;
+    | None ->
+        let d = { Type.name = name; Type.c_type = c_type } in
+        locals := !locals @ [d];
         d, tokens
 
 (*
@@ -200,8 +190,8 @@ let rec stmt tokens =
     let node_v_declaration tokens = (* 変数宣言 *)
         (* TODO ポインタのポインタ *)
         let (_, tokens) = match consume "*" tokens with
-            | Some tokens -> read_v_declaration (TYPE_POINTER TYPE_INT) tokens
-            | None -> read_v_declaration TYPE_INT tokens
+            | Some tokens -> add_declaration (TYPE_POINTER TYPE_INT) tokens
+            | None -> add_declaration TYPE_INT tokens
         in
         Node_No_Op, (expect ";" tokens)
     in
@@ -244,7 +234,7 @@ and primary tokens = match consume "(" tokens with
                 Node_Call (name, args), tokens
             | None ->
                 match find_variables_by_name name with
-                | Some d -> (Node_Variable d, tokens)
+                | Some (d, i) -> (Node_Variable (d, i), tokens)
                 | None -> failwith ("variable " ^ name ^ " is not declared.")
 
 let function_body typed_name params tokens =
@@ -252,22 +242,22 @@ let function_body typed_name params tokens =
     let rec body nodes tokens = match consume "}" tokens with
         | None -> let (node, tokens) = stmt tokens in body (nodes @ [node]) tokens
         | Some tokens -> 
-            Function (typed_name, params, nodes, stack_size ()), tokens
+            Function (typed_name, params, nodes, !locals), tokens
     in
     body [] tokens
 
 let function_definition tokens = 
-    variables := [];
+    locals := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
-    let typed_name = { c_type = TYPE_INT; name = name } in
+    let typed_name = { Type.c_type = TYPE_INT; Type.name = name } in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
     | Some tokens -> function_body typed_name [] tokens
     | None -> 
         let with_params tokens = 
             let tokens = expect "int" tokens in
-            read_v_declaration TYPE_INT tokens
+            add_declaration TYPE_INT tokens
         in
         let (params, tokens) = function_params tokens with_params in
         function_body typed_name params tokens
