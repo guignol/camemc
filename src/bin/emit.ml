@@ -59,7 +59,7 @@ let load size =
     in
     print_string    "  push rax\n"
 
-let emit node = 
+let emit func_name node = 
     let rec emit_address = function
         | Node_Variable (_, name, offset) ->
             printf          "  # variable [%s]\n" name;
@@ -157,7 +157,7 @@ let emit node =
             printf    		".Lend%d:\n" context
         | Node_Return node -> 
             emit_inner node;
-            print_string	"  jmp .Lreturn.main\n" (* TODO 関数名 *)
+            printf			"  jmp .Lreturn.%s\n" func_name
         | Node_Variable (size, _, _) as v ->
             emit_address v;
             load size
@@ -223,7 +223,7 @@ let e globals =
                 ()
             in
             List.iteri stack_params params;
-            List.iter emit body;
+            List.iter (emit name) body;
             printf   		".Lreturn.%s:\n" name;
             (* エピローグ *)
             print_string	"  mov rsp, rbp\n";
