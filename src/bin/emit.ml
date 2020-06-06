@@ -114,7 +114,6 @@ let emit func_name node =
             let context = incr context; !context in
             (* init *)
             emit_inner init;
-            print_string	"  pop rax\n";
             (* begin *)
             printf			".Lcondition%d:\n" context;
             (* condition *)

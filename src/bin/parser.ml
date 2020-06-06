@@ -64,6 +64,8 @@ let binary tokens next operators =
     in
     recursive left tokens
 
+let as_statement (node, tokens) = Node_Expr_Statement (NULL, node), tokens
+
 let function_params tokens arg_consumer = 
     match consume ")" tokens with 
     | Some tokens -> ([], tokens) (* 引数なし *)
@@ -81,14 +83,14 @@ let function_params tokens arg_consumer =
 (* 変数宣言 *)
 let locals: Type.typed_name list ref = ref []
 let find_variables_by_name name =
-	let rec find index = function
-		| [] -> None
-		| head :: tail -> 
-		if head.Type.name = name 
-		then Some (head, index)
-		else find (index + 1) tail
-	in
-	find 0 !locals
+    let rec find index = function
+        | [] -> None
+        | head :: tail -> 
+            if head.Type.name = name 
+            then Some (head, index)
+            else find (index + 1) tail
+    in
+    find 0 !locals
 let add_declaration c_type tokens = 
     let (name, tokens) = Option.get (consume_identifier tokens) in
     match find_variables_by_name name with
@@ -149,13 +151,15 @@ let rec stmt tokens =
         let tokens = expect "(" tokens in
         let (init, tokens) = match consume ";" tokens with
             | Some tokens -> (Node_Int 1, tokens) (* 初期化式なし *)
-            | None -> end_with ";" expr tokens in
+            | None -> as_statement (end_with ";" expr tokens)
+        in
         let (condition, tokens) = match consume ";" tokens with
             | Some tokens -> (Node_Int 1, tokens) (* 条件式なし *)
             | None -> end_with ";" expr tokens in
         let (iteration, tokens) = match consume ")" tokens with
             | Some tokens -> (Node_Int 1, tokens) (* 反復式なし *)
-            | None -> end_with ")" expr tokens in
+            | None -> as_statement (end_with ")" expr tokens)
+        in
         let (execution, tokens) = stmt tokens in
         Node_For (init, condition, iteration, execution), tokens
     in
@@ -183,8 +187,7 @@ let rec stmt tokens =
     match consume "for"		tokens with Some tokens -> node_for tokens | None -> 
     match consume "{"		tokens with Some tokens -> node_block tokens | None -> 
     match consume "int"		tokens with Some tokens -> node_v_declaration tokens | None ->
-        let node, tokens = end_with ";" expr tokens in
-		Node_Expr_Statement (NULL, node), tokens
+        as_statement (end_with ";" expr tokens)
 and expr tokens = assign tokens
 and assign tokens =
     let (left, tokens) = equality tokens in
@@ -233,8 +236,8 @@ let function_definition tokens =
     locals := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
-	let c_type = Type.TYPE_INT in
-	let returned = { Type.c_type; Type.name} in
+    let c_type = Type.TYPE_INT in
+    let returned = { Type.c_type; Type.name} in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
     | Some tokens -> function_body returned [] tokens
