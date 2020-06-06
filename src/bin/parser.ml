@@ -183,7 +183,8 @@ let rec stmt tokens =
     match consume "for"		tokens with Some tokens -> node_for tokens | None -> 
     match consume "{"		tokens with Some tokens -> node_block tokens | None -> 
     match consume "int"		tokens with Some tokens -> node_v_declaration tokens | None ->
-        end_with ";" expr tokens
+        let node, tokens = end_with ";" expr tokens in
+		Node_Expr_Statement (NULL, node), tokens
 and expr tokens = assign tokens
 and assign tokens =
     let (left, tokens) = equality tokens in

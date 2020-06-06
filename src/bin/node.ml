@@ -16,6 +16,7 @@ type 'meta node =
     | Node_Call of		'meta * string * 'meta node list
     | Node_Address of	'meta * 'meta node
     | Node_Deref of		'meta * 'meta node
+    | Node_Expr_Statement of 'meta * 'meta node
 
 let convert mm ii node =
     let rec ff = function
@@ -31,7 +32,8 @@ let convert mm ii node =
         | Node_Block	nodes ->				Node_Block		(List.map ff nodes)
         | Node_Call		(meta, name, args) ->	Node_Call		(mm meta, name, List.map ff args)
         | Node_Address	(meta, node) ->			Node_Address	(mm meta, ff node)
-        | Node_Deref	(meta , node) ->		Node_Deref		(mm meta, ff node)
+        | Node_Deref	(meta, node) ->			Node_Deref		(mm meta, ff node)
+        | Node_Expr_Statement (meta, node) ->	Node_Expr_Statement (mm meta, ff node)
     in
     ff node
 

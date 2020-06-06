@@ -68,6 +68,10 @@ let emit func_name node =
         | Node_Deref (_, node) -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
+        | Node_Expr_Statement (_, node) ->
+            emit_inner node;
+            (* 式文では値をスタックに残さない *)
+            printf			"  add rsp, 8\n"
         | Node_Address (_, node) -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
@@ -98,8 +102,8 @@ let emit func_name node =
             printf			".Lcall%d:\n" context;		
             printf			"  sub rsp, 8\n";		
             printf			"  mov rax, 0\n";		
-            printf			"  call %s\n" name;		
-            printf			"  add rsp, 8\n";		
+            printf			"  call %s\n" name;
+            printf			"  add rsp, 8\n";
             printf			".Lend%d:\n" context;		
             printf			"  push rax\n"
         | Node_No_Op -> 
@@ -165,14 +169,14 @@ let emit func_name node =
             emit_address left;
             emit_inner right;
             let prefix = size_prefix size in
-			let register_name = register_name_rax size in
+            let register_name = register_name_rax size in
             print_string    "  pop rax\n";
             print_string    "  pop rdi\n";
             printf			"  mov %s [rdi], %s\n" prefix register_name;
             print_string    "  push rax\n"
         | Node_Int d ->
             printf  "  push %d\n" d;
-            (* TODO returnの代替 *)
+			(* TODO 外せるはずだけど外せない *)
             printf  "  mov rax, %d\n" d
         | Node_Binary (_, op, left, right) ->
             emit_inner left;
@@ -207,8 +211,8 @@ let e globals =
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
         | Function (name, params, body, stack) ->
-			let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
-			let stack = adjust stack in
+            let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
+            let stack = adjust stack in
             printf   		".global %s\n" name;
             printf   		"%s:\n" name;
             (* プロローグ *)
@@ -216,7 +220,7 @@ let e globals =
             print_string	"  mov rbp, rsp\n";
             printf          "  sub rsp, %d # stack size\n" stack;
             let stack_params i { Untyped.size; Untyped.offset; _} =
-				let prefix = size_prefix size in
+                let prefix = size_prefix size in
                 let register = register_name_for_parameter i size in
                 printf		"  lea rax, [rbp - %d]\n" offset;
                 printf		"  mov %s [rax], %s\n" prefix register;

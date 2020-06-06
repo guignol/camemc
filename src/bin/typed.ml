@@ -16,6 +16,7 @@ let rec get_type = function
     | Node_Call		(c_type, _, _)		-> c_type
     | Node_Address	(c_type, _)			-> c_type
     | Node_Deref	(c_type, _)			-> c_type
+    | Node_Expr_Statement _ -> failwith "Node_Expr_Statement has no type"
 
 let with_type locals node =
     let rec convert = function
@@ -25,18 +26,39 @@ let with_type locals node =
             let left = convert left in
             let right = convert right in
             let left_t = get_type left in
-            let type_b = 
+            let right_t = get_type right in
+            begin
                 match op with
-                | PLUS | MINUS -> 
-                    if is_pointer left_t then TYPE_POINTER left_t else
-                    let right_t = get_type right in
-                    if is_pointer right_t then TYPE_POINTER right_t else TYPE_INT
-                | MUL | DIV -> left_t
-                | _ -> TYPE_INT (* TYPE_BOOL *)
-            in
-            Node_Binary (type_b, op, left, right)
+                | PLUS | MINUS ->
+                    begin
+                        match (left_t, right_t) with
+                        | (TYPE_INT, TYPE_INT) -> 
+                            Node_Binary (TYPE_INT, op, left, right)
+                        | (TYPE_INT, TYPE_POINTER pointed) ->
+							let weight = Type.size pointed in
+							let left = Node_Binary (TYPE_INT, Node.MUL, left, Node_Int weight) in
+                            Node_Binary (TYPE_POINTER pointed, op, left, right)
+                        | (TYPE_POINTER pointed, TYPE_INT) -> 
+							let weight = Type.size pointed in
+							let right = Node_Binary (TYPE_INT, Node.MUL, right, Node_Int weight) in
+                            Node_Binary (TYPE_POINTER pointed, op, left, right)
+                        | (TYPE_POINTER pointed, TYPE_POINTER _) ->
+                            (* TODO ポインタ同士の足し算はできない *)
+                            (* TODO 型の異なるポインタ同士の引き算はできない *)
+							(* TODO ポイントされているサイズで割る *)
+                            let substarcted = Node_Binary (TYPE_INT, op, left, right) in
+							let weight = Type.size pointed in
+							Node_Binary (TYPE_INT, Node.DIV, substarcted, Node_Int weight)
+                        | _ -> failwith "cannot do add/subtract"
+                    end
+                | MUL | DIV -> 
+                    (* TODO ポインタの掛け算はできない *)
+                    Node_Binary (left_t, op, left, right)
+                | _ -> (* TODO TYPE_BOOL *)
+                    Node_Binary (left_t, op, left, right)
+            end
         | Node_Variable (_, name, index) ->
-			let { c_type; _ } = List.nth locals index in
+            let { c_type; _ } = List.nth locals index in
             Node_Variable (c_type, name, index)
         | Node_Assign (_, left, right) ->
             let left = convert left in
@@ -67,6 +89,7 @@ let with_type locals node =
                 | _ -> failwith "it should be pointer type."
             in
             Node_Deref (t, target)
+		| Node_Expr_Statement (_, node) -> Node_Expr_Statement (TYPE_UNDEFINED, convert node)
     in
     convert node
 
