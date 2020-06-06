@@ -35,25 +35,31 @@ let with_type locals node =
                         | (TYPE_INT, TYPE_INT) -> 
                             Node_Binary (TYPE_INT, op, left, right)
                         | (TYPE_INT, TYPE_POINTER pointed) ->
-							let weight = Type.size pointed in
-							let left = Node_Binary (TYPE_INT, Node.MUL, left, Node_Int weight) in
+                            let weight = Type.size pointed in
+                            let left = Node_Binary (TYPE_INT, Node.MUL, left, Node_Int weight) in
                             Node_Binary (TYPE_POINTER pointed, op, left, right)
                         | (TYPE_POINTER pointed, TYPE_INT) -> 
-							let weight = Type.size pointed in
-							let right = Node_Binary (TYPE_INT, Node.MUL, right, Node_Int weight) in
+                            let weight = Type.size pointed in
+                            let right = Node_Binary (TYPE_INT, Node.MUL, right, Node_Int weight) in
                             Node_Binary (TYPE_POINTER pointed, op, left, right)
-                        | (TYPE_POINTER pointed, TYPE_POINTER _) ->
-                            (* TODO ポインタ同士の足し算はできない *)
-                            (* TODO 型の異なるポインタ同士の引き算はできない *)
-							(* TODO ポイントされているサイズで割る *)
+                        | (TYPE_POINTER pointed, TYPE_POINTER _) as pp ->
+                            if op = PLUS (* ポインタ同士の足し算はできない *)
+                            then failwith "cannot add with pointers" else
+                            if not (Type.same pp) (* 型の異なるポインタ同士の引き算はできない *)
+                            then failwith "cannot subtract with different pointers" else 
                             let substarcted = Node_Binary (TYPE_INT, op, left, right) in
-							let weight = Type.size pointed in
-							Node_Binary (TYPE_INT, Node.DIV, substarcted, Node_Int weight)
-                        | _ -> failwith "cannot do add/subtract"
+                            (* ポイントされているサイズで割る *)
+                            let weight = Type.size pointed in
+                            Node_Binary (TYPE_INT, Node.DIV, substarcted, Node_Int weight)
+                        | _ -> failwith "cannot add/subtract"
                     end
                 | MUL | DIV -> 
-                    (* TODO ポインタの掛け算はできない *)
-                    Node_Binary (left_t, op, left, right)
+                    begin
+                        match (left_t, right_t) with (* 掛け算と割り算は数値のみ *)
+                        | (TYPE_INT, TYPE_INT) -> Node_Binary (left_t, op, left, right)
+                        | _ -> failwith "cannot multiply/divide" 
+                        
+                    end
                 | _ -> (* TODO TYPE_BOOL *)
                     Node_Binary (left_t, op, left, right)
             end
@@ -89,7 +95,7 @@ let with_type locals node =
                 | _ -> failwith "it should be pointer type."
             in
             Node_Deref (t, target)
-		| Node_Expr_Statement (_, node) -> Node_Expr_Statement (TYPE_UNDEFINED, convert node)
+        | Node_Expr_Statement (_, node) -> Node_Expr_Statement (TYPE_UNDEFINED, convert node)
     in
     convert node
 
