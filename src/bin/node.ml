@@ -34,3 +34,6 @@ let convert mm ii node =
         | Node_Deref	(meta , node) ->		Node_Deref		(mm meta, ff node)
     in
     ff node
+
+type ('name, 'param, 'meta, 'stack) global = 
+    | Function of 'name * 'param list * 'meta node list * 'stack

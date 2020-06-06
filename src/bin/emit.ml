@@ -206,7 +206,7 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Untyped.Function (name, params, body, stack) ->
+        | Function (name, params, body, stack) ->
 			let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
 			let stack = adjust stack in
             printf   		".global %s\n" name;

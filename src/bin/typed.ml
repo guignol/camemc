@@ -74,9 +74,9 @@ let typed globals =
     let rec t converted = function 
         | [] -> converted
         | global :: globals -> match global with
-              Parser.Function (r_type, name, params, body, locals) ->
+              Function (returned, params, body, locals) ->
                 let body = List.map (with_type locals) body in
-                let f = Parser.Function (r_type, name, params, body, locals) in
+                let f = Function (returned, params, body, locals) in
                 t (converted @ [f]) globals
     in
     t [] globals

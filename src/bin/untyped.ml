@@ -6,9 +6,6 @@ type parameter = {
     offset: int
 }
 
-type 'size global = 
-    | Function of string * parameter list * 'size node list * (* stack *) int
-
 let size_of_type m = Type.size m
 
 let rec offset_list list sum = function
@@ -24,7 +21,7 @@ let untyped globals =
     let rec t converted = function 
         | [] -> converted
         | global :: globals -> match global with
-              Parser.Function (_, name, params, body, locals) ->
+              Function ({ Type.name; _}, params, body, locals) ->
                 let (offset_list, stack) = offset_list [] 0 locals in
                 let offset_of_index i = List.nth offset_list i in
                 let un_typed node = Node.convert size_of_type offset_of_index node in

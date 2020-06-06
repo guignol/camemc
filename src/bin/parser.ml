@@ -2,10 +2,7 @@
 open Printf
 open Node
 
-type none = NULL
-
-type 'meta global = 
-    | Function of Type.c_type * string * Type.typed_name list * 'meta node list * Type.typed_name list
+type nothing = NULL
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -97,7 +94,7 @@ let add_declaration c_type tokens =
     match find_variables_by_name name with
     | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
     | None ->
-        let d = { Type.name = name; Type.c_type = c_type } in
+        let d = { Type.name; Type.c_type } in
         locals := !locals @ [d];
         d, tokens
 
@@ -222,12 +219,12 @@ and primary tokens = match consume "(" tokens with
                 | Some ({ Type.name; _ }, i) -> (Node_Variable (NULL, name, i), tokens)
                 | None -> failwith ("variable " ^ name ^ " is not declared.")
 
-let function_body c_type name params tokens =
+let function_body returned params tokens =
     let tokens = expect "{" tokens in
     let rec body nodes tokens = match consume "}" tokens with
         | None -> let (node, tokens) = stmt tokens in body (nodes @ [node]) tokens
         | Some tokens -> 
-            Function (c_type, name, params, nodes, !locals), tokens
+            Function (returned, params, nodes, !locals), tokens
     in
     body [] tokens
 
@@ -235,17 +232,18 @@ let function_definition tokens =
     locals := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
-	let c_type =Type.TYPE_INT in
+	let c_type = Type.TYPE_INT in
+	let returned = { Type.c_type; Type.name} in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
-    | Some tokens -> function_body c_type name [] tokens
+    | Some tokens -> function_body returned [] tokens
     | None -> 
         let with_params tokens = 
             let tokens = expect "int" tokens in
             add_declaration TYPE_INT tokens
         in
         let (params, tokens) = function_params tokens with_params in
-        function_body c_type name params tokens
+        function_body returned params tokens
 
 let parse tokens =
     let rec parse_globals globals = function
