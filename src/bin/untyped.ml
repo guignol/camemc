@@ -70,7 +70,7 @@ let untyped globals =
                              let name = p.Type.name in
                              let size = Type.size p.Type.c_type in
                              let offset = List.nth offset_list i in
-                             { p_name = name ; size = size; offset = offset }
+                             { p_name = name; size; offset }
                         ) params
                 in
                 let f = Function (name, params, body, stack) in

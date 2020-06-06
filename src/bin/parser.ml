@@ -8,7 +8,7 @@ type node =
     | Node_No_Op
     | Node_Int of int
     | Node_Binary of operation * node * node
-    | Node_Variable of Type.typed_name * int
+    | Node_Variable of string * int
     | Node_Assign of node * node
     | Node_Return of node
     | Node_If of node * node * node
@@ -234,7 +234,7 @@ and primary tokens = match consume "(" tokens with
                 Node_Call (name, args), tokens
             | None ->
                 match find_variables_by_name name with
-                | Some (d, i) -> (Node_Variable (d, i), tokens)
+                | Some ({ Type.name; _ }, i) -> (Node_Variable (name, i), tokens)
                 | None -> failwith ("variable " ^ name ^ " is not declared.")
 
 let function_body typed_name params tokens =
@@ -250,7 +250,7 @@ let function_definition tokens =
     locals := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
-    let typed_name = { Type.c_type = TYPE_INT; Type.name = name } in
+    let typed_name = { Type.c_type = TYPE_INT; Type.name } in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
     | Some tokens -> function_body typed_name [] tokens

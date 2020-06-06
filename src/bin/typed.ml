@@ -31,7 +31,7 @@ let get_type = function
     | Node_Address	(c_type, _)			-> c_type
     | Node_Deref	(c_type, _)			-> c_type
 
-let with_type nodes =
+let with_type locals node =
     let rec convert = function
         | Parser.Node_No_Op -> Node_No_Op
         | Parser.Node_Int d -> Node_Int (TYPE_INT, d)
@@ -49,7 +49,8 @@ let with_type nodes =
                 | _ -> TYPE_INT (* TYPE_BOOL *)
             in
             Node_Binary (type_b, op, left, right)
-        | Parser.Node_Variable ({ c_type; name }, index) ->
+        | Parser.Node_Variable (name, index) ->
+			let { c_type; _ } = List.nth locals index in
             Node_Variable (c_type, name, index)
         | Parser.Node_Assign (left, right) ->
             let left = convert left in
@@ -85,7 +86,7 @@ let with_type nodes =
             in
             Node_Deref (t, sub_node)
     in
-    convert nodes
+    convert node
 
 type global = 
     | Function of c_type * string * typed_name list * node list * typed_name list
@@ -95,7 +96,7 @@ let typed globals =
         | [] -> converted
         | global :: globals -> match global with
               Parser.Function ({ name; c_type }, params, body, locals) ->
-                let body = List.map with_type body in
+                let body = List.map (with_type locals) body in
                 let f = Function (c_type, name, params, body, locals) in
                 t (converted @ [f]) globals
     in
