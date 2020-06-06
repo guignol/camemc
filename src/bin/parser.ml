@@ -1,26 +1,11 @@
 
 open Printf
+open Node
 
-type operation = PLUS | MINUS | MUL | DIV
-               | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
+type none = NULL
 
-type node =
-    | Node_No_Op
-    | Node_Int of int
-    | Node_Binary of operation * node * node
-    | Node_Variable of string * int
-    | Node_Assign of node * node
-    | Node_Return of node
-    | Node_If of node * node * node
-    | Node_While of node * node
-    | Node_For of node * node * node * node
-    | Node_Block of node list
-    | Node_Call of string * node list
-    | Node_Address of node
-    | Node_Deref of node
-
-type global = 
-    | Function of Type.typed_name * Type.typed_name list * node list * Type.typed_name list
+type 'meta global = 
+    | Function of Type.c_type * string * Type.typed_name list * 'meta node list * Type.typed_name list
 
 let operation_of_string = function
     | "+" -> PLUS
@@ -33,7 +18,7 @@ let operation_of_string = function
     | "<=" -> LESS_EQUAL
     | ">" -> GREATER_THAN
     | ">=" -> GREATER_EQUAL
-    | op -> failwith (sprintf "this operation[%s] is not supported" op)
+    | op -> failwith (sprintf "this operation[%s] is not supported here." op)
 
 let consume str = function
     | [] -> None
@@ -74,7 +59,7 @@ let binary tokens next operators =
                 | Some tokens ->
                     let (right, tokens) = next tokens in
                     let op = operation_of_string op_str in
-                    let node = Node_Binary (op, left, right) in
+                    let node = Node_Binary (NULL, op, left, right) in
                     recursive node tokens
                 | None -> consume_operator operators
         in
@@ -207,21 +192,21 @@ and assign tokens =
     let (left, tokens) = equality tokens in
     match consume "=" tokens with None -> (left, tokens) | Some tokens ->
         let (right, tokens) = assign tokens in (* 代入は右結合 *)
-        Node_Assign (left, right), tokens
+        Node_Assign (NULL, left, right), tokens
 and equality tokens =   binary tokens relational ["=="; "!="]
 and relational tokens = binary tokens add        ["<"; "<="; ">"; ">="]
 and add tokens =        binary tokens mul        ["+"; "-"]
 and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
-    match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Address n, t) | None ->
-    match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Deref n, t) | None ->
+    match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Address (NULL, n), t) | None ->
+    match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Deref (NULL, n), t) | None ->
     match consume "+" tokens with Some tokens -> next tokens | None ->
     match consume "-" tokens with
     | Some tokens ->
         let (right, tokens) = next tokens in
         (* -n = 0 - n *)
-        Node_Binary (MINUS, Node_Int 0, right), tokens
+        Node_Binary (NULL, MINUS, Node_Int 0, right), tokens
     | None -> next tokens
 and primary tokens = match consume "(" tokens with
     | Some tokens -> end_with ")" expr tokens
@@ -231,18 +216,18 @@ and primary tokens = match consume "(" tokens with
         | Some (name, tokens) -> match consume "(" tokens with 
             | Some tokens -> (* 関数呼び出し *)
                 let (args, tokens) = function_params tokens expr in
-                Node_Call (name, args), tokens
+                Node_Call (NULL, name, args), tokens
             | None ->
                 match find_variables_by_name name with
-                | Some ({ Type.name; _ }, i) -> (Node_Variable (name, i), tokens)
+                | Some ({ Type.name; _ }, i) -> (Node_Variable (NULL, name, i), tokens)
                 | None -> failwith ("variable " ^ name ^ " is not declared.")
 
-let function_body typed_name params tokens =
+let function_body c_type name params tokens =
     let tokens = expect "{" tokens in
     let rec body nodes tokens = match consume "}" tokens with
         | None -> let (node, tokens) = stmt tokens in body (nodes @ [node]) tokens
         | Some tokens -> 
-            Function (typed_name, params, nodes, !locals), tokens
+            Function (c_type, name, params, nodes, !locals), tokens
     in
     body [] tokens
 
@@ -250,17 +235,17 @@ let function_definition tokens =
     locals := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
-    let typed_name = { Type.c_type = TYPE_INT; Type.name } in
+	let c_type =Type.TYPE_INT in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
-    | Some tokens -> function_body typed_name [] tokens
+    | Some tokens -> function_body c_type name [] tokens
     | None -> 
         let with_params tokens = 
             let tokens = expect "int" tokens in
             add_declaration TYPE_INT tokens
         in
         let (params, tokens) = function_params tokens with_params in
-        function_body typed_name params tokens
+        function_body c_type name params tokens
 
 let parse tokens =
     let rec parse_globals globals = function
