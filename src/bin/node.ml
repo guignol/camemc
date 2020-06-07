@@ -3,39 +3,39 @@ type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
 type 'meta node =
-    | Node_Nop
-    | Node_Int of int
-	| Node_Size of		'meta node
-    | Node_Binary of	'meta * operation * 'meta node * 'meta node
-    | Node_Variable of	'meta * string * int
-    | Node_Assign of	'meta * 'meta node * 'meta node
-    | Node_Return of	'meta node
-    | Node_If of		'meta node * 'meta node * 'meta node
-    | Node_While of		'meta node * 'meta node
-    | Node_For of		'meta node * 'meta node * 'meta node * 'meta node
-    | Node_Block of		'meta node list
-    | Node_Call of		'meta * string * 'meta node list
-    | Node_Address of	'meta * 'meta node
-    | Node_Deref of		'meta * 'meta node
-    | Node_Expr_Statement of 'meta * 'meta node
+    | Nop
+    | Int of int
+	| SizeOf of		'meta node
+    | Binary of		'meta * operation * 'meta node * 'meta node
+    | Variable of	'meta * string * int
+    | Assign of		'meta * 'meta node * 'meta node
+    | Return of		'meta node
+    | If of			'meta node * 'meta node * 'meta node
+    | While of		'meta node * 'meta node
+    | For of		'meta node * 'meta node * 'meta node * 'meta node
+    | Block of		'meta node list
+    | Call of		'meta * string * 'meta node list
+    | Address of	'meta * 'meta node
+    | Deref of		'meta * 'meta node
+    | Expr_Statement of 'meta * 'meta node
 
 let convert mm ii node =
     let rec ff = function
-        | Node_Nop -> Node_Nop
-        | Node_Int		num -> Node_Int num
-		| Node_Size		node ->					Node_Size		(ff node)
-        | Node_Binary	(meta, op, l, r) ->		Node_Binary		(mm meta, op, ff l, ff r)
-        | Node_Variable	(meta, name, index) ->	Node_Variable	(mm meta, name, ii index)
-        | Node_Assign	(meta, l, r) ->			Node_Assign		(mm meta, ff l, ff r)
-        | Node_Return	node ->					Node_Return		(ff node)
-        | Node_If		(c, t, f) ->			Node_If			(ff c, ff t, ff f)
-        | Node_While	(c, e) ->				Node_While		(ff c, ff e)
-        | Node_For		(i, c, iter, e) ->		Node_For		(ff i, ff c, ff iter, ff e)
-        | Node_Block	nodes ->				Node_Block		(List.map ff nodes)
-        | Node_Call		(meta, name, args) ->	Node_Call		(mm meta, name, List.map ff args)
-        | Node_Address	(meta, node) ->			Node_Address	(mm meta, ff node)
-        | Node_Deref	(meta, node) ->			Node_Deref		(mm meta, ff node)
-        | Node_Expr_Statement (meta, node) ->	Node_Expr_Statement (mm meta, ff node)
+        | Nop -> Nop
+        | Int		num -> Int num
+		| SizeOf	node ->					SizeOf		(ff node)
+        | Binary	(meta, op, l, r) ->		Binary		(mm meta, op, ff l, ff r)
+        | Variable	(meta, name, index) ->	Variable	(mm meta, name, ii index)
+        | Assign	(meta, l, r) ->			Assign		(mm meta, ff l, ff r)
+        | Return	node ->					Return		(ff node)
+        | If		(c, t, f) ->			If			(ff c, ff t, ff f)
+        | While		(c, e) ->				While		(ff c, ff e)
+        | For		(i, c, iter, e) ->		For		(ff i, ff c, ff iter, ff e)
+        | Block		nodes ->				Block		(List.map ff nodes)
+        | Call		(meta, name, args) ->	Call		(mm meta, name, List.map ff args)
+        | Address	(meta, node) ->			Address	(mm meta, ff node)
+        | Deref		(meta, node) ->			Deref		(mm meta, ff node)
+        | Expr_Statement (meta, node) ->	Expr_Statement (mm meta, ff node)
     in
     ff node
 

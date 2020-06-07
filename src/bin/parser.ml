@@ -1,20 +1,19 @@
 
 open Printf
-open Node
 
 type nothing = NULL
 
 let operation_of_string = function
-    | "+" -> PLUS
-    | "-" -> MINUS
-    | "*" -> MUL
-    | "/" -> DIV
-    | "==" -> EQUAL
-    | "!=" -> NOT_EQUAL
-    | "<" -> LESS_THAN
-    | "<=" -> LESS_EQUAL
-    | ">" -> GREATER_THAN
-    | ">=" -> GREATER_EQUAL
+    | "+" -> Node.PLUS
+    | "-" -> Node.MINUS
+    | "*" -> Node.MUL
+    | "/" -> Node.DIV
+    | "==" -> Node.EQUAL
+    | "!=" -> Node.NOT_EQUAL
+    | "<" -> Node.LESS_THAN
+    | "<=" -> Node.LESS_EQUAL
+    | ">" -> Node.GREATER_THAN
+    | ">=" -> Node.GREATER_EQUAL
     | op -> failwith (sprintf "this operation[%s] is not supported here." op)
 
 let consume str = function
@@ -43,7 +42,7 @@ let end_with str parser tokens =
     (node, expect str tokens)
 
 let expect_int = function
-    | (Lexer.Number d) :: tokens -> (Node_Int d, tokens)
+    | (Lexer.Number d) :: tokens -> (Node.Int d, tokens)
     | [] -> failwith "tokens are exhausted"
     | t :: _ -> failwith (Lexer.debug_string_of_token t ^ " is not int")
 
@@ -56,7 +55,7 @@ let binary tokens next operators =
                 | Some tokens ->
                     let (right, tokens) = next tokens in
                     let op = operation_of_string op_str in
-                    let node = Node_Binary (NULL, op, left, right) in
+                    let node = Node.Binary (NULL, op, left, right) in
                     recursive node tokens
                 | None -> consume_operator operators
         in
@@ -64,7 +63,7 @@ let binary tokens next operators =
     in
     recursive left tokens
 
-let as_statement (node, tokens) = Node_Expr_Statement (NULL, node), tokens
+let as_statement (node, tokens) = Node.Expr_Statement (NULL, node), tokens
 
 let function_params tokens arg_consumer = 
     match consume ")" tokens with 
@@ -132,7 +131,7 @@ decl_a		= base_type "*"* identifier
 let rec stmt tokens =
     let node_return tokens = 
         let (node, tokens) = expr tokens in
-        Node_Return node, expect ";" tokens
+        Node.Return node, expect ";" tokens
     in
     let node_if tokens = 
         let tokens = expect "(" tokens in
@@ -140,30 +139,30 @@ let rec stmt tokens =
         let (if_true, tokens) = stmt tokens in
         let (if_false, tokens) = match consume "else" tokens with
             | Some tokens -> stmt tokens
-            | None -> (Node_Nop, tokens) in
-        Node_If (condition, if_true, if_false), tokens
+            | None -> (Node.Nop, tokens) in
+        Node.If (condition, if_true, if_false), tokens
     in
     let node_while tokens = 
         let tokens = expect "(" tokens in
         let (condition, tokens) = end_with ")" expr tokens in
         let (execution, tokens) = stmt tokens in
-        Node_While (condition, execution), tokens
+        Node.While (condition, execution), tokens
     in
     let node_for tokens =
         let tokens = expect "(" tokens in
         let (init, tokens) = match consume ";" tokens with
-            | Some tokens -> (Node_Int 1, tokens) (* 初期化式なし *)
+            | Some tokens -> (Node.Int 1, tokens) (* 初期化式なし *)
             | None -> as_statement (end_with ";" expr tokens)
         in
         let (condition, tokens) = match consume ";" tokens with
-            | Some tokens -> (Node_Int 1, tokens) (* 条件式なし *)
+            | Some tokens -> (Node.Int 1, tokens) (* 条件式なし *)
             | None -> end_with ";" expr tokens in
         let (iteration, tokens) = match consume ")" tokens with
-            | Some tokens -> (Node_Int 1, tokens) (* 反復式なし *)
+            | Some tokens -> (Node.Int 1, tokens) (* 反復式なし *)
             | None -> as_statement (end_with ")" expr tokens)
         in
         let (execution, tokens) = stmt tokens in
-        Node_For (init, condition, iteration, execution), tokens
+        Node.For (init, condition, iteration, execution), tokens
     in
     let node_block tokens =
         let rec node_block_rec tokens list = match consume "}" tokens with
@@ -173,15 +172,15 @@ let rec stmt tokens =
                 node_block_rec tokens (list @ [stmt])
         in
         let (nodes, tokens) = node_block_rec tokens [] in
-        Node_Block nodes, tokens
+        Node.Block nodes, tokens
     in
     let node_v_declaration tokens = (* 変数宣言 *)
         (* TODO ポインタのポインタ *)
         let (_, tokens) = match consume "*" tokens with
-            | Some tokens -> add_declaration (TYPE_POINTER TYPE_INT) tokens
-            | None -> add_declaration TYPE_INT tokens
+            | Some tokens -> add_declaration (Type.POINTER Type.INT) tokens
+            | None -> add_declaration Type.INT tokens
         in
-        Node_Nop, (expect ";" tokens)
+        Node.Nop, (expect ";" tokens)
     in
     match consume "return"	tokens with Some tokens -> node_return tokens | None -> 
     match consume "if"		tokens with Some tokens -> node_if tokens | None -> 
@@ -195,7 +194,7 @@ and assign tokens =
     let (left, tokens) = equality tokens in
     match consume "=" tokens with None -> (left, tokens) | Some tokens ->
         let (right, tokens) = assign tokens in (* 代入は右結合 *)
-        Node_Assign (NULL, left, right), tokens
+        Node.Assign (NULL, left, right), tokens
 and equality tokens =   binary tokens relational ["=="; "!="]
 and relational tokens = binary tokens add        ["<"; "<="; ">"; ">="]
 and add tokens =        binary tokens mul        ["+"; "-"]
@@ -203,15 +202,15 @@ and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
 	(* TODO sizeof ( int * ) *)
-    match consume "sizeof" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Size n, t) | None ->
-    match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Address (NULL, n), t) | None ->
-    match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Deref (NULL, n), t) | None ->
+    match consume "sizeof" tokens with Some tokens -> let (n, t) = unary tokens in (Node.SizeOf n, t) | None ->
+    match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node.Address (NULL, n), t) | None ->
+    match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node.Deref (NULL, n), t) | None ->
     match consume "+" tokens with Some tokens -> next tokens | None ->
     match consume "-" tokens with
     | Some tokens ->
         let (right, tokens) = next tokens in
         (* -n = 0 - n *)
-        Node_Binary (NULL, MINUS, Node_Int 0, right), tokens
+        Node.Binary (NULL, Node.MINUS, Node.Int 0, right), tokens
     | None -> next tokens
 and primary tokens = match consume "(" tokens with
     | Some tokens -> end_with ")" expr tokens
@@ -221,10 +220,10 @@ and primary tokens = match consume "(" tokens with
         | Some (name, tokens) -> match consume "(" tokens with 
             | Some tokens -> (* 関数呼び出し *)
                 let (args, tokens) = function_params tokens expr in
-                Node_Call (NULL, name, args), tokens
+                Node.Call (NULL, name, args), tokens
             | None ->
                 match find_variables_by_name name with
-                | Some ({ Type.name; _ }, i) -> (Node_Variable (NULL, name, i), tokens)
+                | Some ({ Type.name; _ }, i) -> (Node.Variable (NULL, name, i), tokens)
                 | None -> failwith ("variable " ^ name ^ " is not declared.")
 
 let function_body returned params tokens =
@@ -232,7 +231,7 @@ let function_body returned params tokens =
     let rec body nodes tokens = match consume "}" tokens with
         | None -> let (node, tokens) = stmt tokens in body (nodes @ [node]) tokens
         | Some tokens -> 
-            Function (returned, params, nodes, !locals), tokens
+            Node.Function (returned, params, nodes, !locals), tokens
     in
     body [] tokens
 
@@ -240,7 +239,7 @@ let function_definition tokens =
     locals := [];
     let tokens = expect "int" tokens in
     let (name, tokens) = Option.get (consume_identifier tokens) in
-    let c_type = Type.TYPE_INT in
+    let c_type = Type.INT in
     let returned = { Type.c_type; Type.name} in
     let tokens = expect "(" tokens in
     match consume ")" tokens with 
@@ -248,7 +247,7 @@ let function_definition tokens =
     | None -> 
         let with_params tokens = 
             let tokens = expect "int" tokens in
-            add_declaration TYPE_INT tokens
+            add_declaration Type.INT tokens
         in
         let (params, tokens) = function_params tokens with_params in
         function_body returned params tokens

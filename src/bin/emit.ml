@@ -1,6 +1,5 @@
 
 open Printf
-open Node
 
 let context = ref 0
 
@@ -61,26 +60,26 @@ let load size =
 
 let emit func_name node = 
     let rec emit_address = function
-        | Node_Variable (_, name, offset) ->
+        | Node.Variable (_, name, offset) ->
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
-        | Node_Deref (_, node) -> emit_inner node
+        | Node.Deref (_, node) -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
-        | Node_Expr_Statement (_, node) ->
+        | Node.Expr_Statement (_, node) ->
             emit_inner node;
             (* 式文では値をスタックに残さない *)
             printf			"  add rsp, 8\n"
-        | Node_Address (_, node) -> 
+        | Node.Address (_, node) -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
-        | Node_Deref (size, node) ->
+        | Node.Deref (size, node) ->
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
             load size
-        | Node_Call (_, name, args) -> 
+        | Node.Call (_, name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
             let pop i _ = 
@@ -106,11 +105,11 @@ let emit func_name node =
             printf			"  add rsp, 8\n";
             printf			".Lend%d:\n" context;		
             printf			"  push rax\n"
-        | Node_Nop -> 
+        | Node.Nop -> 
             print_string	"  # no op\n"
-        | Node_Block nodes ->
+        | Node.Block nodes ->
             List.iter emit_inner nodes
-        | Node_For (init, condition, iteration, execution) ->
+        | Node.For (init, condition, iteration, execution) ->
             let context = incr context; !context in
             (* init *)
             emit_inner init;
@@ -131,7 +130,7 @@ let emit func_name node =
             printf			"  jmp .Lcondition%d\n" context;
             (* end *)
             printf			".Lbreak%d:\n" context
-        | Node_While (condition, execution) ->
+        | Node.While (condition, execution) ->
             let context = incr context; !context in
             (* begin: *)
             printf			".Lcontinue%d:\n" context;
@@ -147,7 +146,7 @@ let emit func_name node =
             (* end: *)
             printf			".Lbreak%d:\n" context
 
-        | Node_If (condition, if_true, if_false) ->
+        | Node.If (condition, if_true, if_false) ->
             let context = incr context; !context in
             emit_inner condition;
             print_string    "  pop rax\n";
@@ -158,13 +157,13 @@ let emit func_name node =
             printf		    ".Lelse%d:\n" context;
             emit_inner if_false;
             printf    		".Lend%d:\n" context
-        | Node_Return node -> 
+        | Node.Return node -> 
             emit_inner node;
             printf			"  jmp .Lreturn.%s\n" func_name
-        | Node_Variable (size, _, _) as v ->
+        | Node.Variable (size, _, _) as v ->
             emit_address v;
             load size
-        | Node_Assign (size, left, right) ->
+        | Node.Assign (size, left, right) ->
             emit_address left;
             emit_inner right;
             let prefix = size_prefix size in
@@ -173,21 +172,21 @@ let emit func_name node =
             print_string    "  pop rdi\n";
             printf			"  mov %s [rdi], %s\n" prefix register_name;
             print_string    "  push rax\n"
-        | Node_Int d ->
+        | Node.Int d ->
             printf  "  push %d\n" d;
             (* TODO 外せるはずだけど外せない *)
             printf  "  mov rax, %d\n" d
-        | Node_Size _ -> failwith "sizeof operator should be consumed."
-        | Node_Binary (_, op, left, right) ->
+        | Node.SizeOf _ -> failwith "sizeof operator should be consumed."
+        | Node.Binary (_, op, left, right) ->
             emit_inner left;
             emit_inner right;
             print_string    "  pop rdi\n";
             print_string    "  pop rax\n";
             begin match op with
-            | PLUS -> print_string  "  add rax, rdi\n";
-            | MINUS -> print_string "  sub rax, rdi\n";
-            | MUL -> print_string   "  imul rax, rdi\n";
-            | DIV ->
+            | Node.PLUS -> print_string  "  add rax, rdi\n";
+            | Node.MINUS -> print_string "  sub rax, rdi\n";
+            | Node.MUL -> print_string   "  imul rax, rdi\n";
+            | Node.DIV ->
                 (*
                 cqo命令を使うと、RAXに入っている64ビットの値を128ビットに伸ばしてRDXとRAXにセットする
                 idivは暗黙のうちにRDXとRAXを取って、それを合わせたものを128ビット整数とみなして、
@@ -195,12 +194,12 @@ let emit func_name node =
                 *)
                 print_string   "  cqo\n";
                 print_string   "  idiv rdi\n";
-            | EQUAL         -> emit_cmp "sete"
-            | NOT_EQUAL     -> emit_cmp "setne"
-            | LESS_THAN     -> emit_cmp "setl"
-            | LESS_EQUAL    -> emit_cmp "setle"
-            | GREATER_THAN  -> emit_cmp "setg"
-            | GREATER_EQUAL -> emit_cmp "setge"
+            | Node.EQUAL         -> emit_cmp "sete"
+            | Node.NOT_EQUAL     -> emit_cmp "setne"
+            | Node.LESS_THAN     -> emit_cmp "setl"
+            | Node.LESS_EQUAL    -> emit_cmp "setle"
+            | Node.GREATER_THAN  -> emit_cmp "setg"
+            | Node.GREATER_EQUAL -> emit_cmp "setge"
             end;
             print_string   "  push rax\n"
     in
@@ -210,7 +209,7 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Function (name, params, body, stack) ->
+        | Node.Function (name, params, body, stack) ->
             let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
             let stack = adjust stack in
             printf   		".global %s\n" name;

@@ -1,4 +1,3 @@
-open Node
 
 type parameter = {
     name: string;
@@ -21,7 +20,7 @@ let untyped globals =
     let rec t converted = function 
         | [] -> converted
         | global :: globals -> match global with
-              Function ({ Type.name; _}, params, body, locals) ->
+              Node.Function ({ Type.name; _}, params, body, locals) ->
                 let (offset_list, stack) = offset_list [] 0 locals in
                 let offset_of_index i = List.nth offset_list i in
                 let un_typed node = Node.convert size_of_type offset_of_index node in
@@ -33,7 +32,7 @@ let untyped globals =
                              { name; size; offset }
                         ) params
                 in
-                let f = Function (name, params, body, stack) in
+                let f = Node.Function (name, params, body, stack) in
                 t (converted @ [f]) globals
     in
     t [] globals 
