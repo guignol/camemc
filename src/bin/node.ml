@@ -3,8 +3,9 @@ type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
 type 'meta node =
-    | Node_No_Op
+    | Node_Nop
     | Node_Int of int
+	| Node_Size of		'meta node
     | Node_Binary of	'meta * operation * 'meta node * 'meta node
     | Node_Variable of	'meta * string * int
     | Node_Assign of	'meta * 'meta node * 'meta node
@@ -20,8 +21,9 @@ type 'meta node =
 
 let convert mm ii node =
     let rec ff = function
-        | Node_No_Op -> Node_No_Op
+        | Node_Nop -> Node_Nop
         | Node_Int		num -> Node_Int num
+		| Node_Size		node ->					Node_Size		(ff node)
         | Node_Binary	(meta, op, l, r) ->		Node_Binary		(mm meta, op, ff l, ff r)
         | Node_Variable	(meta, name, index) ->	Node_Variable	(mm meta, name, ii index)
         | Node_Assign	(meta, l, r) ->			Node_Assign		(mm meta, ff l, ff r)

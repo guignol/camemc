@@ -115,16 +115,18 @@ equality	= relational ("==" relational | "!=" relational)*
 relational	= add ("<" add | "<=" add | ">" add | ">=" add)*
 add			= mul ("+" mul | "-" mul)*
 mul			= unary ("*" unary | "/" unary)*
-unary		= ("+" | "-")? primary
+unary		= "sizeof" unary
 			| "*" unary
 			| "&" unary
+			| ("+" | "-")? primary
 primary		= num 
 			| identifier "(" args? ")"
 			| identifier 
 			| "(" expr ")"
 params		= decl_a ("," decl_a)*
 args		= expr ("," expr)*
-decl_a     = "int" "*"* identifier
+base_type	= "int"
+decl_a		= base_type "*"* identifier
 *)
 
 let rec stmt tokens =
@@ -138,7 +140,7 @@ let rec stmt tokens =
         let (if_true, tokens) = stmt tokens in
         let (if_false, tokens) = match consume "else" tokens with
             | Some tokens -> stmt tokens
-            | None -> (Node_No_Op, tokens) in
+            | None -> (Node_Nop, tokens) in
         Node_If (condition, if_true, if_false), tokens
     in
     let node_while tokens = 
@@ -179,7 +181,7 @@ let rec stmt tokens =
             | Some tokens -> add_declaration (TYPE_POINTER TYPE_INT) tokens
             | None -> add_declaration TYPE_INT tokens
         in
-        Node_No_Op, (expect ";" tokens)
+        Node_Nop, (expect ";" tokens)
     in
     match consume "return"	tokens with Some tokens -> node_return tokens | None -> 
     match consume "if"		tokens with Some tokens -> node_if tokens | None -> 
@@ -200,6 +202,8 @@ and add tokens =        binary tokens mul        ["+"; "-"]
 and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
+	(* TODO sizeof ( int * ) *)
+    match consume "sizeof" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Size n, t) | None ->
     match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Address (NULL, n), t) | None ->
     match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node_Deref (NULL, n), t) | None ->
     match consume "+" tokens with Some tokens -> next tokens | None ->

@@ -3,8 +3,9 @@ open Type
 open Node
 
 let rec get_type = function
-    | Node_No_Op	-> failwith "Node_No_Op has no type"
+    | Node_Nop		-> failwith "Node_No_Op has no type"
     | Node_Int		_					-> TYPE_INT
+	| Node_Size		_					-> TYPE_INT
     | Node_Binary	(c_type, _, _, _)	-> c_type
     | Node_Variable	(c_type, _, _)		-> c_type
     | Node_Assign	(c_type, _, _)		-> c_type
@@ -20,8 +21,9 @@ let rec get_type = function
 
 let with_type locals node =
     let rec convert = function
-        | Node_No_Op -> Node_No_Op
+        | Node_Nop -> Node_Nop
         | Node_Int d -> Node_Int d
+		| Node_Size	node -> Node_Int (Type.size (get_type (convert node)))
         | Node_Binary (_, op, left, right) -> 
             let left = convert left in
             let right = convert right in
@@ -58,7 +60,6 @@ let with_type locals node =
                         match (left_t, right_t) with (* 掛け算と割り算は数値のみ *)
                         | (TYPE_INT, TYPE_INT) -> Node_Binary (left_t, op, left, right)
                         | _ -> failwith "cannot multiply/divide" 
-                        
                     end
                 | _ -> (* TODO TYPE_BOOL *)
                     Node_Binary (left_t, op, left, right)

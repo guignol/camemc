@@ -106,7 +106,7 @@ let emit func_name node =
             printf			"  add rsp, 8\n";
             printf			".Lend%d:\n" context;		
             printf			"  push rax\n"
-        | Node_No_Op -> 
+        | Node_Nop -> 
             print_string	"  # no op\n"
         | Node_Block nodes ->
             List.iter emit_inner nodes
@@ -175,8 +175,9 @@ let emit func_name node =
             print_string    "  push rax\n"
         | Node_Int d ->
             printf  "  push %d\n" d;
-			(* TODO 外せるはずだけど外せない *)
+            (* TODO 外せるはずだけど外せない *)
             printf  "  mov rax, %d\n" d
+        | Node_Size _ -> failwith "sizeof operator should be consumed."
         | Node_Binary (_, op, left, right) ->
             emit_inner left;
             emit_inner right;
