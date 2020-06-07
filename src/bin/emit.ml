@@ -60,7 +60,7 @@ let load size =
 
 let emit func_name node = 
     let rec emit_address = function
-        | Node.Variable (_, name, offset) ->
+        | Node.Variable (_, name, offset, _) ->
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
@@ -160,9 +160,9 @@ let emit func_name node =
         | Node.Return node -> 
             emit_inner node;
             printf			"  jmp .Lreturn.%s\n" func_name
-        | Node.Variable (size, _, _) as v ->
+        | Node.Variable (size, _, _, array) as v ->
             emit_address v;
-            load size
+			if not array then load size else ()
         | Node.Assign (size, left, right) ->
             emit_address left;
             emit_inner right;

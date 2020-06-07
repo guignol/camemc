@@ -42,7 +42,7 @@ let end_with str parser tokens =
     (node, expect str tokens)
 
 let expect_int = function
-    | (Lexer.Number d) :: tokens -> (Node.Int d, tokens)
+    | (Lexer.Number d) :: tokens -> (d, tokens)
     | [] -> failwith "tokens are exhausted"
     | t :: _ -> failwith (Lexer.debug_string_of_token t ^ " is not int")
 
@@ -90,8 +90,7 @@ let find_variables_by_name name =
             else find (index + 1) tail
     in
     find 0 !locals
-let add_declaration c_type tokens = 
-    let (name, tokens) = Option.get (consume_identifier tokens) in
+let add_declaration c_type name tokens =
     match find_variables_by_name name with
     | Some _ -> failwith ("variable " ^ name ^ " is already declared.")
     | None ->
@@ -103,7 +102,7 @@ let add_declaration c_type tokens =
 program		= function
 function   = decl_a "(" params? ")" { stmt* }
 stmt		= ("return")? expr ";"
-			| decl_a ";"
+			| decl_b ";"
         	| "{" stmt* "}"
 	        | "if" "(" expr ")" stmt ("else" stmt)?
 			| "while" "(" expr ")" stmt
@@ -126,6 +125,7 @@ params		= decl_a ("," decl_a)*
 args		= expr ("," expr)*
 base_type	= "int"
 decl_a		= base_type "*"* identifier
+decl_b		= decl_a ("[" num "]")*
 *)
 
 let rec stmt tokens =
@@ -176,11 +176,20 @@ let rec stmt tokens =
     in
     let node_v_declaration tokens = (* 変数宣言 *)
         (* TODO ポインタのポインタ *)
-        let (_, tokens) = match consume "*" tokens with
-            | Some tokens -> add_declaration (Type.POINTER Type.INT) tokens
-            | None -> add_declaration Type.INT tokens
+        let c_type, tokens = match consume "*" tokens with
+            | None -> Type.INT, tokens
+            | Some tokens -> (Type.POINTER Type.INT), tokens
         in
-        Node.Nop, (expect ";" tokens)
+        let (name, tokens) = Option.get (consume_identifier tokens) in
+        (* TODO 配列の配列 *)
+        let c_type, tokens = match consume "[" tokens with
+            | None -> c_type, tokens
+            | Some tokens -> 
+                let d, tokens = expect_int tokens in
+                Type.ARRAY (d, c_type), expect "]" tokens
+        in
+        let (_, tokens) = add_declaration c_type name tokens in
+        Node.Nop, expect ";" tokens
     in
     match consume "return"	tokens with Some tokens -> node_return tokens | None -> 
     match consume "if"		tokens with Some tokens -> node_if tokens | None -> 
@@ -201,7 +210,7 @@ and add tokens =        binary tokens mul        ["+"; "-"]
 and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = primary tokens in
-	(* TODO sizeof ( int * ) *)
+    (* TODO sizeof ( int * ) *)
     match consume "sizeof" tokens with Some tokens -> let (n, t) = unary tokens in (Node.SizeOf n, t) | None ->
     match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node.Address (NULL, n), t) | None ->
     match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node.Deref (NULL, n), t) | None ->
@@ -216,15 +225,15 @@ and primary tokens = match consume "(" tokens with
     | Some tokens -> end_with ")" expr tokens
     | None -> 
         match consume_identifier tokens with
-        | None -> expect_int tokens
+        | None -> let d, tokens = expect_int tokens in Node.Int d, tokens
         | Some (name, tokens) -> match consume "(" tokens with 
             | Some tokens -> (* 関数呼び出し *)
                 let (args, tokens) = function_params tokens expr in
                 Node.Call (NULL, name, args), tokens
             | None ->
                 match find_variables_by_name name with
-                | Some ({ Type.name; _ }, i) -> (Node.Variable (NULL, name, i), tokens)
                 | None -> failwith ("variable " ^ name ^ " is not declared.")
+                | Some ({ Type.name; Type.c_type }, i) -> (Node.Variable (NULL, name, i, Type.is_array c_type), tokens)
 
 let function_body returned params tokens =
     let tokens = expect "{" tokens in
@@ -247,7 +256,8 @@ let function_definition tokens =
     | None -> 
         let with_params tokens = 
             let tokens = expect "int" tokens in
-            add_declaration Type.INT tokens
+            let (name, tokens) = Option.get (consume_identifier tokens) in
+            add_declaration Type.INT name tokens
         in
         let (params, tokens) = function_params tokens with_params in
         function_body returned params tokens

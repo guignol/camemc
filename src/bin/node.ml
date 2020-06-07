@@ -7,7 +7,7 @@ type 'meta node =
     | Int of int
 	| SizeOf of		'meta node
     | Binary of		'meta * operation * 'meta node * 'meta node
-    | Variable of	'meta * string * int
+    | Variable of	'meta * string * int * bool (* is array *)
     | Assign of		'meta * 'meta node * 'meta node
     | Return of		'meta node
     | If of			'meta node * 'meta node * 'meta node
@@ -25,7 +25,7 @@ let convert mm ii node =
         | Int		num -> Int num
 		| SizeOf	node ->					SizeOf		(ff node)
         | Binary	(meta, op, l, r) ->		Binary		(mm meta, op, ff l, ff r)
-        | Variable	(meta, name, index) ->	Variable	(mm meta, name, ii index)
+        | Variable	(meta, name, i, arr) ->	Variable	(mm meta, name, ii i, arr)
         | Assign	(meta, l, r) ->			Assign		(mm meta, ff l, ff r)
         | Return	node ->					Return		(ff node)
         | If		(c, t, f) ->			If			(ff c, ff t, ff f)

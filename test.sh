@@ -32,6 +32,272 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
+# assert 8 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   int *b;
+#   int (*c)[4];
+#   b = a;
+#   c = a;
+#   a[1][2] = 5;
+#   return a[1][2] + 3;
+# }
+# END
+# )"
+
+# assert 8 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   int (*b)[3];
+#   b = &a;
+#   a[1][2] = 5;
+#   return a[1][2] + 3;
+# }
+# END
+# )"
+
+# assert 8 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   int (*b)[3];
+#   b = a;
+#   a[1][2] = 5;
+#   return a[1][2] + 3;
+# }
+# END
+# )"
+
+# assert 8 "$(
+#   cat <<END
+# int main() {
+#   int a[2];
+#   a[0] = 1;
+#   a[1] = 2;
+#   int (*b)[2];
+#   b = &a;
+#   b = a;
+#   (*b)[0] = 5;
+#   (*b)[1] = 3;
+#   return a[0] + a[1];
+# }
+# END
+# )"
+
+# assert 12 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   int *b;
+#   int c;
+#   c = 1;
+#   b = &c;
+#   (*b)[a][2] = 12;
+#   return((*b)[a])[2];
+# }
+# END
+# )"
+
+# assert 12 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   int b[5];
+#   b[4] = 1;
+#   (a[0])[b[4]] = 12;
+#   return (a[0])[1];
+# }
+# END
+# )"
+
+# assert 12 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3][4];
+#   int one;
+#   one = 1;
+#   a[0][one][2] = 7;
+#   one[a][2][3] = 5;
+#   return a[0][one][2] + a[one][2][3];
+# }
+# END
+# )"
+
+# assert 12 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   a[0][0] = 11;
+#   a[0][1] = 12;
+#   a[0][2] = 13;
+#   a[1][0] = 21;
+#   a[1][1] = 22;
+#   a[1][2] = 23;
+#   return a[0][1];
+# }
+# END
+# )"
+
+assert 8 "$(
+  cat <<END
+int main() {
+  int a[2];
+  int b;
+  b = sizeof(a);
+  return b;
+}
+END
+)"
+
+# assert 24 "$(
+#   cat <<END
+# int main() {
+#   int a[2][3];
+#   int b;
+#   b = sizeof(a);
+#   return b;
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   int a[2];
+#   int *b;
+#   int c;
+#   c = 3;
+#   b = &c;
+#   a[0] = *b;
+#   b = &a;
+#   // &a = &c; // TODO これはできない
+#   return *b;
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   int a;
+#   int *b;
+#   int **c;
+#   int ***d;
+#   a = 1;
+#   b = &a;
+#   c = &b;
+#   d = &c;
+#   a = ***d + 2;
+#   return a;
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   // ポインタへのポインタの配列
+#   int **p[4];
+#   int a;
+#   int *b;
+#   int **c;
+#   a = 1;
+#   b = &a;
+#   c = &b;
+#   p[0] = c;
+#   a = *(*(p[0])) + 2;
+#   return **p[0];  // 3
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   int a[2];
+#   0[a] = 1;
+#   1[a] = 2;
+#   int *p;
+#   p = a;
+#   int maji;
+#   maji = 0[p]; // ポインタにも[]使える
+#   return maji + 1[a];  // 3
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   int a[5];
+#   a[0] = 1;
+#   a[1] = 2;
+#   a[2] = 3;
+#   a[3] = 4;
+#   a[4] = 5;
+#   int maji;
+#   maji = a[1 + 3]; // ポインタにも[]使える
+#   return maji - a[1];  // 3
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   int a[2];
+#   a[0] = 1;
+#   a[1] = 2;
+#   int *p;
+#   p = a;
+#   int maji;
+#   maji = p[0]; // ポインタにも[]使える
+#   return maji + a[1];  // 3
+# }
+# END
+# )"
+
+assert 3 "$(
+  cat <<END
+int main() {
+  int *a[2];
+  int b;
+  int *c;
+  int *d;
+  b = 3;
+  c = &b;
+  *a = c;
+  d = *a;
+  return *d;
+}
+END
+)"
+
+assert 3 "$(
+  cat <<END
+int main() {
+  int a[2];
+  *a = 3;
+  return *a;
+}
+END
+)"
+
+assert 3 "$(
+  cat <<END
+int main() {
+  int a[2];
+  *a = 1;
+  *(a + 1) = 2;
+  int *p;
+  p = a;
+  return *p + *(p + 1);  // 3
+}
+END
+)"
+
 try 4 'int x; return sizeof(x);'
 try 8 'int *y; return sizeof(y);'
 try 4 'int x; return sizeof(x + 3);'

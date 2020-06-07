@@ -2,9 +2,9 @@
 let rec get_type = function
     | Node.Nop		-> failwith "Nop has no type"
     | Node.Int		_					-> Type.INT
-	| Node.SizeOf		_				-> Type.INT
+    | Node.SizeOf		_				-> Type.INT
     | Node.Binary	(c_type, _, _, _)	-> c_type
-    | Node.Variable	(c_type, _, _)		-> c_type
+    | Node.Variable	(c_type, _, _, _)	-> c_type
     | Node.Assign	(c_type, _, _)		-> c_type
     | Node.Return	node				-> get_type node
     | Node.If		_ -> failwith "If has no type"
@@ -20,7 +20,7 @@ let with_type locals node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int d -> Node.Int d
-		| Node.SizeOf	node -> Node.Int (Type.size (get_type (convert node)))
+        | Node.SizeOf	node -> Node.Int (Type.size (get_type (convert node)))
         | Node.Binary (_, op, left, right) -> 
             let left = convert left in
             let right = convert right in
@@ -33,15 +33,18 @@ let with_type locals node =
                         match (left_t, right_t) with
                         | (Type.INT, Type.INT) -> 
                             Node.Binary (Type.INT, op, left, right)
-                        | (Type.INT, Type.POINTER pointed) ->
+                        | (Type.INT, Type.POINTER pointed)
+                        | (Type.INT, Type.ARRAY (_, pointed)) -> 
                             let weight = Type.size pointed in
                             let left = Node.Binary (Type.INT, Node.MUL, left, Node.Int weight) in
                             Binary (Type.POINTER pointed, op, left, right)
-                        | (Type.POINTER pointed, Type.INT) -> 
+                        | (Type.POINTER pointed, Type.INT) 
+                        | (Type.ARRAY (_, pointed), Type.INT) -> 
                             let weight = Type.size pointed in
                             let right = Node.Binary (Type.INT, Node.MUL, right, Node.Int weight) in
                             Node.Binary (Type.POINTER pointed, op, left, right)
                         | (Type.POINTER pointed, Type.POINTER _) as pp ->
+                            (* TODO 配列も混ぜて引き算できる？ *)
                             if op = PLUS (* ポインタ同士の足し算はできない *)
                             then failwith "cannot add with pointers" else
                             if not (Type.same pp) (* 型の異なるポインタ同士の引き算はできない *)
@@ -61,9 +64,9 @@ let with_type locals node =
                 | _ -> (* TODO Type.BOOL *)
                     Node.Binary (left_t, op, left, right)
             end
-        | Node.Variable (_, name, index) ->
+        | Node.Variable (_, name, index, array) ->
             let { Type.c_type; _ } = List.nth locals index in
-            Node.Variable (c_type, name, index)
+            Node.Variable (c_type, name, index, array)
         | Node.Assign (_, left, right) ->
             let left = convert left in
             let right = convert right in
@@ -90,6 +93,7 @@ let with_type locals node =
             let target = convert node in
             let t = match get_type target with
                 | Type.POINTER pointed -> pointed
+                | Type.ARRAY (_, element) -> element
                 | _ -> failwith "it should be pointer type."
             in
             Node.Deref (t, target)
