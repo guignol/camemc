@@ -25,6 +25,11 @@ let rec same (type_1, type_2) =
     | _, UNDEFINED -> failwith ""
     | _ -> false
 
+let rec to_string = function
+    | UNDEFINED -> "UNDEFINED"
+    | INT -> "INT"
+    | POINTER pointed -> "POINTER of " ^ to_string pointed
+    | ARRAY (_, element) -> "ARRAY of " ^ to_string element
 
 type typed_name = {
     c_type: c_type;

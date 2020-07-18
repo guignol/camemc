@@ -5,6 +5,7 @@ let rec get_type = function
     | Node.SizeOf		_				-> Type.INT
     | Node.Binary	(c_type, _, _, _)	-> c_type
     | Node.Variable	(c_type, _, _, _)	-> c_type
+    | Node.Global	(c_type, _)			-> c_type
     | Node.Assign	(c_type, _, _)		-> c_type
     | Node.Return	node				-> get_type node
     | Node.If		_ -> failwith "If has no type"
@@ -12,7 +13,7 @@ let rec get_type = function
     | Node.For		_ -> failwith "For has no type"
     | Node.Block	_ -> failwith "Block has no type"
     | Node.Call		(c_type, _, _)		-> c_type
-    | Node.Address	(c_type, _)			-> c_type
+    | Node.Address	node				-> Type.POINTER (get_type node)
     | Node.Deref	(c_type, _)			-> c_type
     | Node.Expr_Statement _ -> failwith "Expr_Statement has no type"
 
@@ -20,7 +21,7 @@ let with_type locals node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int d -> Node.Int d
-        | Node.SizeOf	node -> Node.Int (Type.size (get_type (convert node)))
+        | Node.SizeOf node -> Node.Int (Type.size (get_type (convert node)))
         | Node.Binary (_, op, left, right) -> 
             let left = convert left in
             let right = convert right in
@@ -67,6 +68,9 @@ let with_type locals node =
         | Node.Variable (_, name, index, array) ->
             let { Type.c_type; _ } = List.nth locals index in
             Node.Variable (c_type, name, index, array)
+        | Node.Global (_, name) ->
+            (* グローバル変数 *)
+            Node.Global (Type.INT, name)
         | Node.Assign (_, left, right) ->
             let left = convert left in
             let right = convert right in
@@ -86,9 +90,9 @@ let with_type locals node =
             let args = List.map convert args in
             (* TODO 関数の前方宣言から帰り値の型を探す? *)
             Node.Call (Type.INT, name, args)
-        | Node.Address (_, node) ->
+        | Node.Address node ->
             let pointed = convert node in
-            Node.Address (Type.POINTER (get_type pointed), pointed)
+            Node.Address pointed
         | Node.Deref (_, node) ->
             let target = convert node in
             let t = match get_type target with
@@ -97,17 +101,20 @@ let with_type locals node =
                 | _ -> failwith "it should be pointer type."
             in
             Node.Deref (t, target)
-        | Node.Expr_Statement (_, node) -> Node.Expr_Statement (Type.UNDEFINED, convert node)
+        | Node.Expr_Statement node -> Node.Expr_Statement (convert node)
     in
     convert node
 
-let typed globals = 
+let typed top_levels = 
     let rec t converted = function 
         | [] -> converted
-        | global :: globals -> match global with
-              Node.Function (returned, params, body, locals) ->
+        | head :: top_levels -> match head with
+            | Global.Function (returned, params, body, locals) ->
                 let body = List.map (with_type locals) body in
-                let f = Node.Function (returned, params, body, locals) in
-                t (converted @ [f]) globals
+                let f = Global.Function (returned, params, body, locals) in
+                t (converted @ [f]) top_levels
+            | Global.Variable (_, name) ->
+				let g = Global.Variable (name.Type.c_type, name) in
+                t (converted @ [g]) top_levels
     in
-    t [] globals
+    t [] top_levels

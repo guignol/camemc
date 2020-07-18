@@ -18,19 +18,159 @@ assert() {
 		${DIR}/tmp
 		actual="$?"
 	else
-		actual="failed"
+		# actual="failed"
+		actual="$?"
 	fi
 
 	if [ "$actual" = "$expected" ]; then
 		echo "[$actual] $input"
 	else
-		echo "[$expected expected, but got $actual] $input"
+		echo "[$expected expected, but got $actual]"
+		echo "$input"
 		echo errrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrror
 		exit 1
 	fi
 }
 
 gcc -o ${DIR}/foo.s -S foo.c
+
+# assert 9 "$(
+#   cat <<END
+# int main() {
+#   printf("日本語ですね\n");
+#   return 9;
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   char *moji;
+#   moji = "moji\ndesu\nne\n";
+#   printf(moji);
+#   return 3;
+# }
+# END
+# )"
+
+# assert 13 "$(
+#   cat <<END
+# int main() {
+#   char a[4];
+#   char (*b)[4];
+#   b = &a;
+#   (*b)[3] = 13;
+#   return (*b)[3];
+# }
+# END
+# )"
+
+# assert 8 "$(
+#   cat <<END
+# int main() {
+#   char a[2][3];
+#   char (*b)[3];
+#   b = &a;
+#   a[1][2] = 5;
+#   return a[1][2] + 3;
+# }
+# END
+# )"
+
+# assert 1 "$(
+#   cat <<END
+# char chaa(char c) {
+#   return c + 1;
+# }
+# int main() {
+#   char c;
+#   c = sizeof(c);
+#   int i;
+#   i = chaa(c);
+#   return i - c;
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int main() {
+#   char x[3];
+#   x[0] = -1;
+#   x[1] = 2;
+#   int y;
+#   y = 4;
+#   return x[0] + y;
+# }
+# END
+# )"
+
+# assert 5 "$(
+#   cat <<END
+# int *a;
+# int *b;
+# int main() {
+#   int a; // 型の異なるローカル変数
+#   a = 3;
+#   b =  &a;
+#   *b = 2 + a;
+#   return a;
+# }
+# END
+# )"
+
+# assert 9 "$(
+#   cat <<END
+# int a;
+# int *b;
+# int main() {
+#   a = 1;
+#   b =  &a;
+#   *b = 8 + a;
+#   return a;
+# }
+# END
+# )"
+
+# assert 3 "$(
+#   cat <<END
+# int a;
+# int init() {
+#   a = 6;
+# }
+# int main() {
+#   int b;
+#   init();
+#   b = a;
+#   int a;
+#   a = 3;
+#   return b - a;
+# }
+# END
+# )"
+
+assert 3 "$(
+  cat <<END
+int a;
+int main() {
+  a = 3;
+  return a;
+}
+END
+)"
+
+assert 3 "$(
+  cat <<END
+int a;
+int main() {
+  a = 3;
+  int b;
+  b = 6;
+  return b - a;
+}
+END
+)"
 
 # assert 8 "$(
 #   cat <<END

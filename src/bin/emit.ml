@@ -64,21 +64,24 @@ let emit func_name node =
             printf          "  # variable [%s]\n" name;
             printf          "  lea rax, [rbp - %d]\n" offset;
             print_string    "  push rax\n"
+        | Node.Global (_, name) ->
+            printf    		"  lea rax, %s[rip]\n" name;
+            print_string    "  push rax\n"
         | Node.Deref (_, node) -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
-        | Node.Expr_Statement (_, node) ->
+        | Node.Expr_Statement node ->
             emit_inner node;
             (* 式文では値をスタックに残さない *)
             printf			"  add rsp, 8\n"
-        | Node.Address (_, node) -> 
+        | Node.Address node -> 
             (* 変数のアドレスをスタックに積むだけ *)
             emit_address node
         | Node.Deref (size, node) ->
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
-            load size
+            load size; print_string "# gggggggggggggggggg\n"
         | Node.Call (_, name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
@@ -162,7 +165,10 @@ let emit func_name node =
             printf			"  jmp .Lreturn.%s\n" func_name
         | Node.Variable (size, _, _, array) as v ->
             emit_address v;
-			if not array then load size else ()
+            if not array then load size else ()
+        | Node.Global (size, _) as v ->
+            emit_address v;
+            load size
         | Node.Assign (size, left, right) ->
             emit_address left;
             emit_inner right;
@@ -207,9 +213,9 @@ let emit func_name node =
 
 let e globals = 
     print_string			".intel_syntax noprefix\n";
-    print_string			".text\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
-        | Node.Function (name, params, body, stack) ->
+        | Global.Function (name, params, body, stack) ->
+    		print_string	".text\n";
             let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
             let stack = adjust stack in
             printf   		".global %s\n" name;
@@ -232,6 +238,12 @@ let e globals =
             print_string	"  mov rsp, rbp\n";
             print_string	"  pop rbp\n";
             print_string	"  ret\n";
+            emit_globals globals
+        | Global.Variable (size, name) ->
+    		print_string	".data\n";
+            (* printf   		".global %s\n" name; *)
+            printf   		"%s:\n" name;
+			printf			"  .zero %d\n" size;
             emit_globals globals
     in
     emit_globals globals

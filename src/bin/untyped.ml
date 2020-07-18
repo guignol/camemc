@@ -20,7 +20,7 @@ let untyped globals =
     let rec t converted = function 
         | [] -> converted
         | global :: globals -> match global with
-              Node.Function ({ Type.name; _}, params, body, locals) ->
+            | Global.Function ({ Type.name; _}, params, body, locals) ->
                 let (offset_list, stack) = offset_list [] 0 locals in
                 let offset_of_index i = List.nth offset_list i in
                 let un_typed node = Node.convert size_of_type offset_of_index node in
@@ -32,7 +32,10 @@ let untyped globals =
                              { name; size; offset }
                         ) params
                 in
-                let f = Node.Function (name, params, body, stack) in
+                let f = Global.Function (name, params, body, stack) in
                 t (converted @ [f]) globals
+            | Global.Variable (c_type, { Type.name; _}) -> 
+                let g = Global.Variable (size_of_type c_type, name) in
+                t (converted @ [g]) globals
     in
     t [] globals 
