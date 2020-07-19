@@ -17,7 +17,7 @@ let rec get_type = function
     | Node.Deref	(c_type, _)			-> c_type
     | Node.Expr_Statement _ -> failwith "Expr_Statement has no type"
 
-let with_type locals node =
+let with_type locals globals node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int d -> Node.Int d
@@ -70,7 +70,9 @@ let with_type locals node =
             Node.Variable (c_type, name, index, array)
         | Node.Global (_, name) ->
             (* グローバル変数 *)
-            Node.Global (Type.INT, name)
+            let by_name g = g.Type.name = name in
+            let { Type.c_type; Type.name } = List.find by_name globals in 
+            Node.Global (c_type, name)
         | Node.Assign (_, left, right) ->
             let left = convert left in
             let right = convert right in
@@ -106,15 +108,15 @@ let with_type locals node =
     convert node
 
 let typed top_levels = 
-    let rec t converted = function 
+    let rec t converted globals = function 
         | [] -> converted
         | head :: top_levels -> match head with
             | Global.Function (returned, params, body, locals) ->
-                let body = List.map (with_type locals) body in
+                let body = List.map (with_type locals globals) body in
                 let f = Global.Function (returned, params, body, locals) in
-                t (converted @ [f]) top_levels
+                t (converted @ [f]) globals top_levels
             | Global.Variable (_, name) ->
-				let g = Global.Variable (name.Type.c_type, name) in
-                t (converted @ [g]) top_levels
+                let g = Global.Variable (name.Type.c_type, name) in
+                t (converted @ [g]) (name :: globals) top_levels
     in
-    t [] top_levels
+    t [] [] top_levels
