@@ -133,22 +133,22 @@ gcc -o ${DIR}/foo.s -S foo.c
 # END
 # )"
 
-# assert 3 "$(
-#   cat <<END
-# int a;
-# int init() {
-#   a = 6;
-# }
-# int main() {
-#   int b;
-#   init();
-#   b = a;
-#   int a;
-#   a = 3;
-#   return b - a;
-# }
-# END
-# )"
+assert 3 "$(
+  cat <<END
+int a;
+int init() {
+  a = 6;
+}
+int main() {
+  int b;
+  init();
+  b = a;
+  int a;
+  a = 3;
+  return b - a;
+}
+END
+)"
 
 assert 3 "$(
   cat <<END

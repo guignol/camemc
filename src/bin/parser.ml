@@ -28,6 +28,16 @@ let consume_identifier = function
         | Lexer.Identifier name -> Some (name, tail)
         | _ -> None
 
+(* TODO ポインタのポインタ *)
+let consume_pointer base tokens = match consume "*" tokens with
+    | None -> base, tokens
+    | Some tokens -> (Type.POINTER base), tokens
+
+let consume_typed_name base tokens =
+	let c_type, tokens = consume_pointer base tokens in
+    let name, tokens = Option.get (consume_identifier tokens) in
+    { Type.c_type; Type.name }, tokens
+
 let expect str tokens = 
     try Option.get (consume str tokens) 
     with Invalid_argument _ ->
@@ -161,12 +171,7 @@ let rec stmt tokens =
         Node.Block nodes, tokens
     in
     let node_v_declaration tokens = (* 変数宣言 *)
-        (* TODO ポインタのポインタ *)
-        let c_type, tokens = match consume "*" tokens with
-            | None -> Type.INT, tokens
-            | Some tokens -> (Type.POINTER Type.INT), tokens
-        in
-        let name, tokens = Option.get (consume_identifier tokens) in
+        let { Type.c_type; Type.name }, tokens = consume_typed_name Type.INT tokens in
         (* TODO 配列の配列 *)
         let c_type, tokens = match consume "[" tokens with
             | None -> c_type, tokens
@@ -255,26 +260,18 @@ let function_definition returned tokens =
         | Some tokens -> [], tokens
         | None -> 
             let with_params tokens = 
-                let tokens = expect "int" tokens in
-                let name, tokens = Option.get (consume_identifier tokens) in
-				let c_type = Type.INT in
-                Declaration.add Locally { Type.c_type; Type.name }, tokens
+                let name, tokens = consume_typed_name Type.INT (expect "int" tokens) in
+                Declaration.add Locally name, tokens
             in
             function_params tokens with_params
     in
     function_body returned params tokens
 
-let typed_name tokens = 
-    let tokens = expect "int" tokens in
-    let name, tokens = Option.get (consume_identifier tokens) in
-    let c_type = Type.INT in
-    { Type.c_type; Type.name }, tokens
-
 let parse tokens =
     let rec parse_globals top_levels = function
         | [] -> top_levels, []
         | tokens ->
-            let name, tokens = typed_name tokens in
+            let name, tokens = consume_typed_name Type.INT (expect "int" tokens) in
             match consume "(" tokens with
             | Some tokens ->
                 (* 関数定義 *)
