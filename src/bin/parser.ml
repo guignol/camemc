@@ -34,11 +34,25 @@ let consume_pointer base tokens = match consume "*" tokens with
     | Some tokens -> (Type.POINTER base), tokens
 
 let consume_typed_name base tokens =
-	let c_type, tokens = consume_pointer base tokens in
+    let c_type, tokens = consume_pointer base tokens in
     let name, tokens = Option.get (consume_identifier tokens) in
     { Type.c_type; Type.name }, tokens
 
-let expect str tokens = 
+let rec consume_function_params tokens arg_consumer = 
+    match consume ")" tokens with 
+    | Some tokens -> [], tokens (* 引数なし *)
+    | None -> (* 引数あり *)
+        let (arg, tokens) = arg_consumer tokens in
+        let rec consume_args args tokens = match consume "," tokens with
+            | None -> (args, expect ")" tokens)
+            | Some tokens -> 
+                let arg, tokens = arg_consumer tokens in
+                let args = args @ [arg] in
+                consume_args args tokens
+        in
+        consume_args [arg] tokens
+
+and expect str tokens = 
     try Option.get (consume str tokens) 
     with Invalid_argument _ ->
         let token_name = match tokens with
@@ -74,20 +88,6 @@ let binary tokens next operators =
     recursive left tokens
 
 let discard_result (node, tokens) = Node.Expr_Statement node, tokens
-
-let function_params tokens arg_consumer = 
-    match consume ")" tokens with 
-    | Some tokens -> [], tokens (* 引数なし *)
-    | None -> (* 引数あり *)
-        let (arg, tokens) = arg_consumer tokens in
-        let rec consume_args args tokens = match consume "," tokens with
-            | None -> (args, expect ")" tokens)
-            | Some tokens -> 
-                let arg, tokens = arg_consumer tokens in
-                let args = args @ [arg] in
-                consume_args args tokens
-        in
-        consume_args [arg] tokens
 
 (*
 program		= function
@@ -170,8 +170,8 @@ let rec stmt tokens =
         let nodes, tokens = node_block_rec tokens [] in
         Node.Block nodes, tokens
     in
-    let node_v_declaration tokens = (* 変数宣言 *)
-        let { Type.c_type; Type.name }, tokens = consume_typed_name Type.INT tokens in
+    let node_v_declaration base_type tokens = (* 変数宣言 *)
+        let { Type.c_type; Type.name }, tokens = consume_typed_name base_type tokens in
         (* TODO 配列の配列 *)
         let c_type, tokens = match consume "[" tokens with
             | None -> c_type, tokens
@@ -180,6 +180,7 @@ let rec stmt tokens =
                 Type.ARRAY (d, c_type), expect "]" tokens
         in
         let _ = Declaration.add Locally { Type.c_type; Type.name } in
+        (* TODO 初期化 *)
         Node.Nop, expect ";" tokens
     in
     match consume "return"	tokens with Some tokens -> node_return tokens | None -> 
@@ -187,8 +188,7 @@ let rec stmt tokens =
     match consume "while"	tokens with Some tokens -> node_while tokens | None -> 
     match consume "for"		tokens with Some tokens -> node_for tokens | None -> 
     match consume "{"		tokens with Some tokens -> node_block tokens | None -> 
-    match consume "int"		tokens with Some tokens -> node_v_declaration tokens | None ->
-        (* 式文 *)
+    match consume "int"		tokens with Some tokens -> node_v_declaration Type.INT tokens | None ->
         discard_result (end_with ";" expr tokens)
 and expr tokens = assign tokens
 and assign tokens =
@@ -231,7 +231,7 @@ and primary tokens = match consume "(" tokens with
         | Some (name, tokens) -> match consume "(" tokens with 
             | Some tokens -> (* 関数呼び出し *)
                 (* TODO 前方定義の確認 *)
-                let args, tokens = function_params tokens expr in
+                let args, tokens = consume_function_params tokens expr in
                 Node.Call (NULL, name, args), tokens
             | None ->
                 (* ローカル変数 *)
@@ -246,26 +246,22 @@ and primary tokens = match consume "(" tokens with
                     | None -> 
                         failwith ("variable " ^ name ^ " is not declared.")
 
-let function_body returned params tokens =
+let function_body tokens =
     let tokens = expect "{" tokens in
     let rec body nodes tokens = match consume "}" tokens with
         | None -> let node, tokens = stmt tokens in body (nodes @ [node]) tokens
-        | Some tokens -> Global.Function (returned, params, nodes, !Declaration.locals), tokens
+        | Some tokens -> nodes, tokens
     in
     body [] tokens
 
-let function_definition returned tokens = 
-    Declaration.locals := [];
-    let params, tokens = match consume ")" tokens with 
-        | Some tokens -> [], tokens
-        | None -> 
-            let with_params tokens = 
-                let name, tokens = consume_typed_name Type.INT (expect "int" tokens) in
-                Declaration.add Locally name, tokens
-            in
-            function_params tokens with_params
-    in
-    function_body returned params tokens
+let function_params tokens = match consume ")" tokens with 
+    | Some tokens -> [], tokens
+    | None -> 
+        let with_params tokens = 
+            let name, tokens = consume_typed_name Type.INT (expect "int" tokens) in
+            Declaration.add Locally name, tokens
+        in
+        consume_function_params tokens with_params
 
 let parse tokens =
     let rec parse_globals top_levels = function
@@ -275,7 +271,10 @@ let parse tokens =
             match consume "(" tokens with
             | Some tokens ->
                 (* 関数定義 *)
-                let f, tokens = function_definition name tokens in
+                Declaration.locals := [];
+                let params, tokens = function_params tokens in
+                let body, tokens = function_body tokens in
+                let f = Global.Function (name, params, body, !Declaration.locals) in
                 parse_globals (top_levels @ [f]) tokens
             | None -> 
                 (* グローバル変数宣言 *)

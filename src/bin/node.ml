@@ -2,12 +2,12 @@
 type operation = PLUS | MINUS | MUL | DIV
                | EQUAL | NOT_EQUAL | LESS_THAN | LESS_EQUAL | GREATER_THAN | GREATER_EQUAL
 
-type 'meta node =
+type 'meta (* null -> type -> int *) node =
     | Nop
     | Int of int
     | SizeOf of		'meta node
     | Binary of		'meta * operation * 'meta node * 'meta node
-    | Variable of	'meta * string * int (* index *) * bool (* is array *)
+    | Variable of	'meta * string * int (* index -> offset *) * bool (* is array *)
     | Global of		'meta * string
     | Assign of		'meta * 'meta node * 'meta node
     | Return of		'meta node
