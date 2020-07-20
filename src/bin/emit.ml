@@ -67,7 +67,9 @@ let emit func_name node =
         | Node.Global (_, name) ->
             printf    		"  lea rax, %s[rip]\n" name;
             print_string    "  push rax\n"
-        | Node.Deref (_, node) -> emit_inner node
+        | Node.Deref (_, node) 
+        | Node.Indexed (_, node)
+            -> emit_inner node
         | _ -> failwith "This node can't emit address."
     and emit_inner = function
         | Node.Expr_Statement node ->
@@ -81,7 +83,10 @@ let emit func_name node =
             (* ポインタ変数の値（アドレス）をスタックに積む *)
             emit_inner node;
             (* それをロードする *)
-            load size; print_string "# gggggggggggggggggg\n"
+            load size
+        | Node.Indexed (_, node) ->
+            (* ポインタ変数の値（アドレス）をスタックに積む *)
+            emit_inner node
         | Node.Call (_, name, args) -> 
             List.iter emit_inner args;
             let count = List.length args in
@@ -162,6 +167,7 @@ let emit func_name node =
             printf    		".Lend%d:\n" context
         | Node.Return node -> 
             emit_inner node;
+            print_string    "  pop rax\n";
             printf			"  jmp .Lreturn.%s\n" func_name
         | Node.Variable (size, _, _, array) as v ->
             emit_address v;
@@ -215,7 +221,7 @@ let e globals =
     print_string			".intel_syntax noprefix\n";
     let rec emit_globals = function | [] -> () | global :: globals -> match global with
         | Global.Function (name, params, body, stack) ->
-    		print_string	".text\n";
+            print_string	".text\n";
             let rec adjust stack = if (stack mod 16) = 0 then stack else adjust (stack + 1) in
             let stack = adjust stack in
             printf   		".global %s\n" name;
@@ -240,10 +246,10 @@ let e globals =
             print_string	"  ret\n";
             emit_globals globals
         | Global.Variable (size, name) ->
-    		print_string	".data\n";
+            print_string	".data\n";
             (* printf   		".global %s\n" name; *)
             printf   		"%s:\n" name;
-			printf			"  .zero %d\n" size;
+            printf			"  .zero %d\n" size;
             emit_globals globals
     in
     emit_globals globals

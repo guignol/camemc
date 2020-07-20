@@ -15,6 +15,7 @@ let rec get_type = function
     | Node.Call		(c_type, _, _)		-> c_type
     | Node.Address	node				-> Type.POINTER (get_type node)
     | Node.Deref	(c_type, _)			-> c_type
+    | Node.Indexed	(c_type, _)			-> c_type
     | Node.Expr_Statement _ -> failwith "Expr_Statement has no type"
 
 let with_type locals globals node =
@@ -97,12 +98,23 @@ let with_type locals globals node =
             Node.Address pointed
         | Node.Deref (_, node) ->
             let target = convert node in
-            let t = match get_type target with
-                | Type.POINTER pointed -> pointed
-                | Type.ARRAY (_, element) -> element
-                | _ -> failwith "it should be pointer type."
-            in
-            Node.Deref (t, target)
+            begin match get_type target with
+            | Type.POINTER pointed -> Node.Deref (pointed, target)
+            | Type.ARRAY (_, element) -> Node.Deref (element, target)
+            | _ -> failwith "it should be pointer type or array."
+            end
+        | Node.Indexed (_, node) ->
+            let target = convert node in
+            begin match get_type target with
+            | Type.POINTER element
+            | Type.ARRAY (_, element) -> 
+				if Type.is_array element
+				(* 配列から配列を取り出す場合 *)
+				then Node.Indexed (element, target)
+				(* 配列から配列以外の要素を取り出す場合 *)
+				else Node.Deref (element, target)
+            | _ -> failwith "it should be pointer type or array."
+            end
         | Node.Expr_Statement node -> Node.Expr_Statement (convert node)
     in
     convert node

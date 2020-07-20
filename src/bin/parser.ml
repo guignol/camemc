@@ -171,13 +171,14 @@ let rec stmt tokens =
     in
     let node_v_declaration base_type tokens = (* 変数宣言 *)
         let { Type.c_type; Type.name }, tokens = consume_typed_name base_type tokens in
-        (* TODO 配列の配列 *)
-        let c_type, tokens = match consume "[" tokens with
+        let rec consume_array c_type tokens = match consume "[" tokens with
             | None -> c_type, tokens
             | Some tokens -> 
-                let d, tokens = expect_int tokens in
-                Type.ARRAY (d, c_type), expect "]" tokens
+                let size, tokens = expect_int tokens in
+				let c_type = Type.ARRAY (size, c_type) in
+                consume_array c_type (expect "]" tokens)
         in
+        let c_type, tokens = consume_array c_type tokens in
         let _ = Declaration.add Locally { Type.c_type; Type.name } in
         (* TODO 初期化 *)
         Node.Nop, expect ";" tokens
@@ -212,12 +213,13 @@ and unary tokens =
         Node.Binary (NULL, Node.MINUS, Node.Int 0, right), tokens
     | None -> next tokens
 and accessor tokens =
-    let rec with_indexer (left, tokens) = match consume "[" tokens with
+    let rec with_indexer  (left, tokens) = match consume "[" tokens with
         | None -> left, tokens
         | Some tokens -> 
             let right, tokens = expr tokens in
             (* a[b] は *(a+b) に展開される *)
-            let node = Node.Deref (NULL, Node.Binary (NULL, Node.PLUS, left, right)) in
+            (* a[b][c] は *((a + b) + c) に展開される *)
+            let node = Node.Indexed (NULL, Node.Binary (NULL, Node.PLUS, left, right)) in
             with_indexer (node, expect "]" tokens)
     in
     with_indexer (primary tokens)

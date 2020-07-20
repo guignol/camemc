@@ -226,59 +226,59 @@ END
 # END
 # )"
 
-# assert 12 "$(
-#   cat <<END
-# int main() {
-#   int a[2][3];
-#   int *b;
-#   int c;
-#   c = 1;
-#   b = &c;
-#   (*b)[a][2] = 12;
-#   return((*b)[a])[2];
-# }
-# END
-# )"
+assert 12 "$(
+  cat <<END
+int main() {
+  int a[2][3];
+  int *b;
+  int c;
+  c = 1;
+  b = &c;
+  (*b)[a][2] = 12;
+  return ((*b)[a])[2];
+}
+END
+)"
 
-# assert 12 "$(
-#   cat <<END
-# int main() {
-#   int a[2][3];
-#   int b[5];
-#   b[4] = 1;
-#   (a[0])[b[4]] = 12;
-#   return (a[0])[1];
-# }
-# END
-# )"
+assert 12 "$(
+  cat <<END
+int main() {
+  int a[2][3];
+  int b[5];
+  b[4] = 1;
+  (a[0])[b[4]] = 12;
+  return (a[0])[1];
+}
+END
+)"
 
-# assert 12 "$(
-#   cat <<END
-# int main() {
-#   int a[2][3][4];
-#   int one;
-#   one = 1;
-#   a[0][one][2] = 7;
-#   one[a][2][3] = 5;
-#   return a[0][one][2] + a[one][2][3];
-# }
-# END
-# )"
+assert 12 "$(
+  cat <<END
+int main() {
+  int a[2][3][4];
+  int one;
+  one = 1;
+  a[0][one][2] = 7;
+  one[a][2][3] = 5;
+  return a[0][one][2] + a[one][2][3];
+}
+END
+)"
 
-# assert 12 "$(
-#   cat <<END
-# int main() {
-#   int a[2][3];
-#   a[0][0] = 11;
-#   a[0][1] = 12;
-#   a[0][2] = 13;
-#   a[1][0] = 21;
-#   a[1][1] = 22;
-#   a[1][2] = 23;
-#   return a[0][1];
-# }
-# END
-# )"
+assert 12 "$(
+  cat <<END
+int main() {
+  int a[2][3];
+  a[0][0] = 11;
+  a[0][1] = 12;
+  a[0][2] = 13;
+  a[1][0] = 21;
+  a[1][1] = 22;
+  a[1][2] = 23;
+  return a[0][1];
+}
+END
+)"
 
 assert 8 "$(
   cat <<END
@@ -291,16 +291,16 @@ int main() {
 END
 )"
 
-# assert 24 "$(
-#   cat <<END
-# int main() {
-#   int a[2][3];
-#   int b;
-#   b = sizeof(a);
-#   return b;
-# }
-# END
-# )"
+assert 24 "$(
+  cat <<END
+int main() {
+  int a[2][3];
+  int b;
+  b = sizeof(a);
+  return b;
+}
+END
+)"
 
 assert 3 "$(
   cat <<END

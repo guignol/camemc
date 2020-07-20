@@ -10,18 +10,19 @@ let untyped_node offset_of_index node =
         | Node.Nop -> Node.Nop
         | Node.Int		num -> Int num
         | Node.SizeOf	node ->					SizeOf		(convert node)
-        | Node.Binary	(meta, op, l, r) ->		Binary		(Type.size meta, op, convert l, convert r)
-        | Node.Variable	(meta, name, i, arr) ->	Variable	(Type.size meta, name, offset_of_index i, arr)
-        | Node.Global	(meta, name) ->			Global		(Type.size meta, name)
-        | Node.Assign	(meta, l, r) ->			Assign		(Type.size meta, convert l, convert r)
+        | Node.Binary	(tp, op, l, r) ->		Binary		(Type.size tp, op, convert l, convert r)
+        | Node.Variable	(tp, name, i, arr) ->	Variable	(Type.size tp, name, offset_of_index i, arr)
+        | Node.Global	(tp, name) ->			Global		(Type.size tp, name)
+        | Node.Assign	(tp, l, r) ->			Assign		(Type.size tp, convert l, convert r)
         | Node.Return	node ->					Return		(convert node)
         | Node.If		(c, t, f) ->			If			(convert c, convert t, convert f)
         | Node.While	(c, e) ->				While		(convert c, convert e)
         | Node.For		(i, c, iter, e) ->		For			(convert i, convert c, convert iter, convert e)
         | Node.Block	nodes ->				Block		(List.map convert nodes)
-        | Node.Call		(meta, name, args) ->	Call		(Type.size meta, name, List.map convert args)
+        | Node.Call		(tp, name, args) ->		Call		(Type.size tp, name, List.map convert args)
         | Node.Address	node ->					Address		(convert node)
-        | Node.Deref	(meta, node) ->			Deref		(Type.size meta, convert node)
+        | Node.Deref	(tp, node) ->			Deref		(Type.size tp, convert node)
+        | Node.Indexed	(_, node) ->			Indexed		(0, convert node)
         | Node.Expr_Statement node ->			Expr_Statement (convert node)
     in
     convert node

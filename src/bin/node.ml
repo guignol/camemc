@@ -18,4 +18,5 @@ type 'meta (* null -> type -> int *) node =
     | Call of		'meta * string * 'meta node list
     | Address of	'meta node
     | Deref of		'meta * 'meta node
+	| Indexed of	'meta * 'meta node
     | Expr_Statement of 'meta node
