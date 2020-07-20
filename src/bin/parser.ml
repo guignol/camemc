@@ -28,10 +28,9 @@ let consume_identifier = function
         | Lexer.Identifier name -> Some (name, tail)
         | _ -> None
 
-(* TODO ポインタのポインタ *)
-let consume_pointer base tokens = match consume "*" tokens with
+let rec consume_pointer base tokens = match consume "*" tokens with
     | None -> base, tokens
-    | Some tokens -> (Type.POINTER base), tokens
+    | Some tokens -> consume_pointer (Type.POINTER base) tokens
 
 let consume_typed_name base tokens =
     let c_type, tokens = consume_pointer base tokens in
@@ -202,7 +201,6 @@ and add tokens =        binary tokens mul        ["+"; "-"]
 and mul tokens =        binary tokens unary      ["*"; "/"]
 and unary tokens =
     let next tokens = accessor tokens in
-    (* TODO sizeof ( int * ) *)
     match consume "sizeof" tokens with Some tokens -> let (n, t) = unary tokens in (Node.SizeOf n, t) | None ->
     match consume "&" tokens with Some tokens -> let (n, t) = unary tokens in (Node.Address n, t) | None ->
     match consume "*" tokens with Some tokens -> let (n, t) = unary tokens in (Node.Deref (NULL, n), t) | None ->
