@@ -32,10 +32,9 @@ let rec consume_pointer base tokens = match consume "*" tokens with
     | None -> base, tokens
     | Some tokens -> consume_pointer (Type.POINTER base) tokens
 
-let consume_typed_name base tokens =
-    let c_type, tokens = consume_pointer base tokens in
-    let name, tokens = Option.get (consume_identifier tokens) in
-    { Type.c_type; Type.name }, tokens
+let consume_base_type tokens = 
+    match consume "int"	tokens	with Some tokens -> Some Type.INT, tokens	| None ->  
+    match consume "char" tokens	with Some tokens -> Some Type.CHAR, tokens	| None -> None, tokens 
 
 let rec consume_function_params tokens arg_consumer = 
     match consume ")" tokens with 
@@ -52,22 +51,31 @@ let rec consume_function_params tokens arg_consumer =
         consume_args [arg] tokens
 
 and expect str tokens = 
-    try Option.get (consume str tokens) 
-    with Invalid_argument _ ->
+    try Option.get (consume str tokens) with 
+    | Invalid_argument _ ->
         let token_name = match tokens with
             | [] -> "none"
             | t :: _ -> Lexer.debug_string_of_token t
         in
         failwith (str ^ " is expected but " ^ token_name)
 
-let end_with str parser tokens = 
-    let node, tokens = parser tokens in
-    node, expect str tokens
-
 let expect_int = function
     | (Lexer.Number d) :: tokens -> d, tokens
     | [] -> failwith "tokens are exhausted"
-    | t :: _ -> failwith (Lexer.debug_string_of_token t ^ " is not int")
+    | t :: _ -> failwith (Lexer.debug_string_of_token t ^ " is not int")  
+
+let expect_typed_name_with base tokens =
+    let c_type, tokens = consume_pointer base tokens in
+    let name, tokens = Option.get (consume_identifier tokens) in
+    { Type.c_type; Type.name }, tokens 
+
+let expect_typed_name tokens =
+    let base, tokens = consume_base_type tokens in
+    expect_typed_name_with (Option.get base) tokens
+
+let end_with str parser tokens = 
+    let node, tokens = parser tokens in
+    node, expect str tokens
 
 let binary tokens next operators =
     let (left, tokens) = next tokens in
@@ -169,13 +177,13 @@ let rec stmt tokens =
         let nodes, tokens = node_block_rec tokens [] in
         Node.Block nodes, tokens
     in
-    let node_v_declaration base_type tokens = (* 変数宣言 *)
-        let { Type.c_type; Type.name }, tokens = consume_typed_name base_type tokens in
+    let node_v_declaration base tokens = (* 変数宣言 *)
+        let { Type.c_type; Type.name }, tokens = expect_typed_name_with base tokens in
         let rec consume_array c_type tokens = match consume "[" tokens with
             | None -> c_type, tokens
             | Some tokens -> 
                 let size, tokens = expect_int tokens in
-				let c_type = Type.ARRAY (size, c_type) in
+                let c_type = Type.ARRAY (size, c_type) in
                 consume_array c_type (expect "]" tokens)
         in
         let c_type, tokens = consume_array c_type tokens in
@@ -188,7 +196,7 @@ let rec stmt tokens =
     match consume "while"	tokens with Some tokens -> node_while tokens | None -> 
     match consume "for"		tokens with Some tokens -> node_for tokens | None -> 
     match consume "{"		tokens with Some tokens -> node_block tokens | None -> 
-    match consume "int"		tokens with Some tokens -> node_v_declaration Type.INT tokens | None ->
+    match consume_base_type tokens with (Some t, tokens) -> node_v_declaration t tokens | _ ->
         discard_result (end_with ";" expr tokens)
 and expr tokens = assign tokens
 and assign tokens =
@@ -258,7 +266,7 @@ let function_params tokens = match consume ")" tokens with
     | Some tokens -> [], tokens
     | None -> 
         let with_params tokens = 
-            let name, tokens = consume_typed_name Type.INT (expect "int" tokens) in
+            let name, tokens = expect_typed_name tokens in
             Declaration.add Locally name, tokens
         in
         consume_function_params tokens with_params
@@ -267,7 +275,7 @@ let parse tokens =
     let rec parse_globals top_levels = function
         | [] -> top_levels, []
         | tokens ->
-            let name, tokens = consume_typed_name Type.INT (expect "int" tokens) in
+            let name, tokens = expect_typed_name tokens in
             match consume "(" tokens with
             | Some tokens ->
                 (* 関数定義 *)

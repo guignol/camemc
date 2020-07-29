@@ -78,33 +78,43 @@ gcc -o ${DIR}/foo.s -S foo.c
 # END
 # )"
 
-# assert 1 "$(
-#   cat <<END
-# char chaa(char c) {
-#   return c + 1;
-# }
-# int main() {
-#   char c;
-#   c = sizeof(c);
-#   int i;
-#   i = chaa(c);
-#   return i - c;
-# }
-# END
-# )"
+assert 1 "$(
+  cat <<END
+char chaa(char c) {
+  return c + 1;
+}
+int main() {
+  char c;
+  c = sizeof(c);
+  int i;
+  i = chaa(c);
+  return i - c;
+}
+END
+)"
 
-# assert 3 "$(
-#   cat <<END
-# int main() {
-#   char x[3];
-#   x[0] = -1;
-#   x[1] = 2;
-#   int y;
-#   y = 4;
-#   return x[0] + y;
-# }
-# END
-# )"
+assert 3 "$(
+  cat <<END
+int main() {
+  char x[3];
+  x[0] = -1;
+  x[1] = 2;
+  int y;
+  y = 4;
+  return x[0] + y;
+}
+END
+)"
+
+assert 3 "$(
+  cat <<END
+int main() {
+  char x;
+  x = 3;
+  return x;
+}
+END
+)"
 
 assert 5 "$(
   cat <<END

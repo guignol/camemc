@@ -18,6 +18,8 @@ let rec get_type = function
     | Node.Indexed	(c_type, _)			-> c_type
     | Node.Expr_Statement _ -> failwith "Expr_Statement has no type"
 
+let is_degit	= function Type.INT | Type.CHAR -> true | _ -> false
+
 let with_type locals globals node =
     let rec convert = function
         | Node.Nop -> Node.Nop
@@ -33,15 +35,15 @@ let with_type locals globals node =
                 | Node.PLUS | Node.MINUS ->
                     begin
                         match (left_t, right_t) with
-                        | (Type.INT, Type.INT) -> 
+                        | (d1, d2) when is_degit d1 && is_degit d2 ->
                             Node.Binary (Type.INT, op, left, right)
-                        | (Type.INT, Type.POINTER pointed)
-                        | (Type.INT, Type.ARRAY (_, pointed)) -> 
+                        | (d1, Type.POINTER pointed)
+                        | (d1, Type.ARRAY (_, pointed)) when is_degit d1 -> 
                             let weight = Type.size pointed in
                             let left = Node.Binary (Type.INT, Node.MUL, left, Node.Int weight) in
                             Binary (Type.POINTER pointed, op, left, right)
-                        | (Type.POINTER pointed, Type.INT) 
-                        | (Type.ARRAY (_, pointed), Type.INT) -> 
+                        | (Type.POINTER pointed, d2) 
+                        | (Type.ARRAY (_, pointed), d2) when is_degit d2 -> 
                             let weight = Type.size pointed in
                             let right = Node.Binary (Type.INT, Node.MUL, right, Node.Int weight) in
                             Node.Binary (Type.POINTER pointed, op, left, right)
@@ -57,12 +59,10 @@ let with_type locals globals node =
                             Node.Binary (Type.INT, Node.DIV, substarcted, Node.Int weight)
                         | _ -> failwith "cannot add/subtract"
                     end
-                | Node.MUL | Node.DIV -> 
-                    begin
-                        match (left_t, right_t) with (* 掛け算と割り算は数値のみ *)
-                        | (Type.INT, Type.INT) -> Node.Binary (left_t, op, left, right)
-                        | _ -> failwith "cannot multiply/divide" 
-                    end
+                | Node.MUL | Node.DIV -> (* 掛け算と割り算は数値のみ *)
+					if is_degit left_t && is_degit right_t
+					then Node.Binary (Type.INT, op, left, right)
+					else failwith "cannot multiply/divide"
                 | _ -> (* TODO Type.BOOL *)
                     Node.Binary (left_t, op, left, right)
             end
@@ -108,11 +108,11 @@ let with_type locals globals node =
             begin match get_type target with
             | Type.POINTER element
             | Type.ARRAY (_, element) -> 
-				if Type.is_array element
-				(* 配列から配列を取り出す場合 *)
-				then Node.Indexed (element, target)
-				(* 配列から配列以外の要素を取り出す場合 *)
-				else Node.Deref (element, target)
+                if Type.is_array element
+                (* 配列から配列を取り出す場合 *)
+                then Node.Indexed (element, target)
+                (* 配列から配列以外の要素を取り出す場合 *)
+                else Node.Deref (element, target)
             | _ -> failwith "it should be pointer type or array."
             end
         | Node.Expr_Statement node -> Node.Expr_Statement (convert node)

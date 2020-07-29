@@ -2,6 +2,7 @@
 type c_type =
     | UNDEFINED
     | INT 
+    | CHAR 
     (* | TYPE_BOOL  *)
     | POINTER of c_type
     | ARRAY of int * c_type
@@ -9,6 +10,7 @@ type c_type =
 let rec size = function
     | UNDEFINED -> 0
     | INT -> 4
+    | CHAR -> 1
     | POINTER _ -> 8
     | ARRAY (s, e) -> s * size e
 
@@ -28,6 +30,7 @@ let rec same (type_1, type_2) =
 let rec to_string = function
     | UNDEFINED -> "UNDEFINED"
     | INT -> "INT"
+    | CHAR -> "CHAR"
     | POINTER pointed -> "POINTER of " ^ to_string pointed
     | ARRAY (_, element) -> "ARRAY of " ^ to_string element
 
