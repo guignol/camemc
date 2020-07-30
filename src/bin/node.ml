@@ -5,6 +5,7 @@ type operation = PLUS | MINUS | MUL | DIV
 type 'meta (* null -> type -> int *) node =
     | Nop
     | Int of int
+    | String of string
     | SizeOf of		'meta node
     | Binary of		'meta * operation * 'meta node * 'meta node
     | Variable of	'meta * string * int (* index -> offset *) * bool (* is array *)

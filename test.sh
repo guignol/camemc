@@ -34,25 +34,25 @@ assert() {
 
 gcc -o ${DIR}/foo.s -S foo.c
 
-# assert 9 "$(
-#   cat <<END
-# int main() {
-#   printf("日本語ですね\n");
-#   return 9;
-# }
-# END
-# )"
+assert 9 "$(
+  cat <<END
+int main() {
+  printf("日本語ですね\n");
+  return 9;
+}
+END
+)"
 
-# assert 3 "$(
-#   cat <<END
-# int main() {
-#   char *moji;
-#   moji = "moji\ndesu\nne\n";
-#   printf(moji);
-#   return 3;
-# }
-# END
-# )"
+assert 3 "$(
+  cat <<END
+int main() {
+  char *moji;
+  moji = "moji\ndesu\nne\n";
+  printf(moji);
+  return 3;
+}
+END
+)"
 
 # assert 13 "$(
 #   cat <<END

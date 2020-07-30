@@ -28,6 +28,23 @@ let consume_identifier = function
         | Lexer.Identifier name -> Some (name, tail)
         | _ -> None
 
+(* 文字列リテラル *)
+let literals: (('name, 'param, 'meta, 'stack) Global.top_level) list ref = ref []
+
+let add_literal literal = 
+    let length = List.length !literals in
+    let label = sprintf ".LC.%d" (length + 1) in
+    literals :=  !literals @ [Global.String (label, literal)];
+	label
+
+let consume_string = function
+    | [] -> None
+    | head :: tail -> match head with
+        | Lexer.String literal -> 
+            let label = add_literal literal in
+            Some (label, tail)
+        | _ -> None
+
 let rec consume_pointer base tokens = match consume "*" tokens with
     | None -> base, tokens
     | Some tokens -> consume_pointer (Type.POINTER base) tokens
@@ -233,10 +250,9 @@ and accessor tokens =
     with_indexer (primary tokens)
 and primary tokens = match consume "(" tokens with
     | Some tokens -> end_with ")" expr tokens
-    | None -> 
-        match consume_identifier tokens with
-        | None -> let d, tokens = expect_int tokens in Node.Int d, tokens
-        | Some (name, tokens) -> match consume "(" tokens with 
+    | None -> match consume_identifier tokens with
+        | Some (name, tokens) -> 
+            begin match consume "(" tokens with 
             | Some tokens -> (* 関数呼び出し *)
                 (* TODO 前方定義の確認 *)
                 let args, tokens = consume_function_params tokens expr in
@@ -253,6 +269,11 @@ and primary tokens = match consume "(" tokens with
                         Node.Global (NULL, name), tokens
                     | None -> 
                         failwith ("variable " ^ name ^ " is not declared.")
+            end
+        | None -> 
+            match consume_string tokens with
+            | Some (label, tokens) -> Node.String label, tokens
+            | None -> let d, tokens = expect_int tokens in Node.Int d, tokens
 
 let function_body tokens =
     let tokens = expect "{" tokens in
@@ -301,4 +322,4 @@ let parse tokens =
             end
     in
     Declaration.locals := [];
-    top_levels
+    !literals @ top_levels

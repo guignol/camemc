@@ -9,6 +9,7 @@ let untyped_node offset_of_index node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int		num -> Int num
+        | Node.String	label -> String label
         | Node.SizeOf	node ->					SizeOf		(convert node)
         | Node.Binary	(c_type, op, l, r) ->	Binary		(Type.size c_type, op, convert l, convert r)
         | Node.Variable	(c_type, name, i, a) ->	Variable	(Type.size c_type, name, offset_of_index i, a)
@@ -56,5 +57,8 @@ let untyped globals =
             | Global.Variable (c_type, { Type.name; _}) -> 
                 let g = Global.Variable (Type.size c_type, name) in
                 convert (converted @ [g]) globals
+            | Global.String (label, literal) -> 
+				let s = Global.String (label, literal) in
+                convert (converted @ [s]) globals
     in
     convert [] globals 

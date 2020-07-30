@@ -6,6 +6,7 @@ type token =
     | Number of int
     | Reserved of string
     | Identifier of string
+    | String of string
 
 let starts_with str ch = match index_opt str ch with
     | Some index -> index = 0
@@ -48,9 +49,10 @@ let tokenize reader =
             | Some str when str = target -> Some (length, target)
             | _ -> None
         in
-        let read_reserved offset r = read_input (cursor + offset) (tokens @ [Reserved r]) in
-        let read_number offset d = read_input (cursor + offset) (tokens @ [Number d]) in
-        let read_identifier offset id = read_input (cursor + offset) (tokens @ [Identifier id]) in
+        let read_reserved offset r		= read_input (cursor + offset) (tokens @ [Reserved r]) in
+        let read_number offset d		= read_input (cursor + offset) (tokens @ [Number d]) in
+        let read_identifier offset id	= read_input (cursor + offset) (tokens @ [Identifier id]) in
+        let read_string offset literal	= read_input (cursor + offset) (tokens @ [String literal]) in
         let search_keywords ch = List.find_map (equals ch (fun ch -> not (is_alnum ch))) in
         let search_symbols ch = List.find_map (equals ch (fun _ -> true)) in
         let skip_comments ch = 
@@ -64,10 +66,26 @@ let tokenize reader =
                 in
                 Some (search_line_break 2)
         in
+        let read_string_literal ch =
+            match equals ch (fun _ -> true) "\"" with
+            | Some (_, _) -> 
+                (* TODO リテラル内のダブルクォート *)
+                let rec concat_string count buffer =
+                    match reader (cursor + count) with
+                    | None -> failwith "" (* 末尾 *)
+                    | Some ch -> 
+                        if ch = '\"' 
+                        then count + 1, buffer
+                        else concat_string (count + 1) (buffer ^ String.make 1 ch)
+                in
+                Some (concat_string 1 "")
+            | None -> None 
+        in
         match reader cursor with None -> tokens | Some ch ->
             (* スペース *)
             if is_space ch then read_input (cursor + 1) tokens else
-			match skip_comments ch with Some offset -> read_input (cursor + offset) tokens | None ->
+            match skip_comments ch with Some offset -> read_input (cursor + offset) tokens | None ->
+            match read_string_literal ch with Some (offset, literal) -> read_string offset literal | None ->
             (* Keyword *)
             match search_keywords ch ["return"; "if"; "else"; "while"; "for"; "int"; "char"; "sizeof"] with 
             | Some (offset, found) -> read_reserved offset found | None ->
@@ -107,6 +125,7 @@ let debug_string_of_token = function
     | Number d -> sprintf "%d(number)" d
     | Reserved r -> sprintf "%s(reserved)" r
     | Identifier s -> sprintf "%s(identifier)" s
+    | String s -> sprintf "\"%s\"(string literal)" s
 
 let print_token t = print_string (debug_string_of_token t)
 

@@ -2,6 +2,7 @@
 let rec get_type = function
     | Node.Nop		-> failwith "Nop has no type"
     | Node.Int		_					-> Type.INT
+    | Node.String		_				-> Type.POINTER Type.CHAR
     | Node.SizeOf		_				-> Type.INT
     | Node.Binary	(c_type, _, _, _)	-> c_type
     | Node.Variable	(c_type, _, _, _)	-> c_type
@@ -24,6 +25,7 @@ let with_type locals globals node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int d -> Node.Int d
+        | Node.String label -> Node.String label
         | Node.SizeOf node -> Node.Int (Type.size (get_type (convert node)))
         | Node.Binary (_, op, left, right) -> 
             let left = convert left in
@@ -60,9 +62,9 @@ let with_type locals globals node =
                         | _ -> failwith "cannot add/subtract"
                     end
                 | Node.MUL | Node.DIV -> (* 掛け算と割り算は数値のみ *)
-					if is_degit left_t && is_degit right_t
-					then Node.Binary (Type.INT, op, left, right)
-					else failwith "cannot multiply/divide"
+                    if is_degit left_t && is_degit right_t
+                    then Node.Binary (Type.INT, op, left, right)
+                    else failwith "cannot multiply/divide"
                 | _ -> (* TODO Type.BOOL *)
                     Node.Binary (left_t, op, left, right)
             end
@@ -130,5 +132,8 @@ let typed top_levels =
             | Global.Variable (_, name) ->
                 let g = Global.Variable (name.Type.c_type, name) in
                 t (converted @ [g]) (name :: globals) top_levels
+            | Global.String (label, literal) -> 
+                let s = Global.String (label, literal) in
+                t (converted @ [s]) globals top_levels
     in
     t [] [] top_levels

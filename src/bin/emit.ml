@@ -188,6 +188,9 @@ let emit func_name node =
             printf  "  push %d\n" d;
             (* TODO 外せるはずだけど外せない *)
             printf  "  mov rax, %d\n" d
+        | Node.String label ->
+            printf	"  mov rax, OFFSET FLAT:%s\n" label;
+            printf	"  push rax\n";
         | Node.SizeOf _ -> failwith "sizeof operator should be consumed."
         | Node.Binary (_, op, left, right) ->
             emit_inner left;
@@ -250,6 +253,12 @@ let e globals =
             (* printf   		".global %s\n" name; *)
             printf   		"%s:\n" name;
             printf			"  .zero %d\n" size;
+            emit_globals globals
+        | Global.String (label, literal) ->
+            print_string	".data\n";
+            (* printf   		".global %s\n" label; *)
+            printf			"%s:\n" label;
+            printf			"  .string \"%s\"\n" literal;
             emit_globals globals
     in
     emit_globals globals
