@@ -122,18 +122,15 @@ let with_type locals globals node =
     convert node
 
 let typed top_levels = 
-    let rec t converted globals = function 
-        | [] -> converted
+    let rec t globals = function 
+        | [] -> []
         | head :: top_levels -> match head with
             | Global.Function (returned, params, body, locals) ->
                 let body = List.map (with_type locals globals) body in
-                let f = Global.Function (returned, params, body, locals) in
-                t (converted @ [f]) globals top_levels
+                Global.Function (returned, params, body, locals) :: t globals top_levels
             | Global.Variable (_, name) ->
-                let g = Global.Variable (name.Type.c_type, name) in
-                t (converted @ [g]) (name :: globals) top_levels
+                Global.Variable (name.Type.c_type, name) :: t (name :: globals) top_levels
             | Global.String (label, literal) -> 
-                let s = Global.String (label, literal) in
-                t (converted @ [s]) globals top_levels
+                Global.String (label, literal) :: t globals top_levels
     in
-    t [] [] top_levels
+    t [] top_levels

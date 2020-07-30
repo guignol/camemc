@@ -35,7 +35,7 @@ let add_literal literal =
     let length = List.length !literals in
     let label = sprintf ".LC.%d" (length + 1) in
     literals :=  !literals @ [Global.String (label, literal)];
-	label
+    label
 
 let consume_string = function
     | [] -> None
@@ -204,7 +204,7 @@ let rec stmt tokens =
                 consume_array c_type (expect "]" tokens)
         in
         let c_type, tokens = consume_array c_type tokens in
-        let _ = Declaration.add Locally { Type.c_type; Type.name } in
+        Declaration.add Locally { Type.c_type; Type.name };
         (* TODO 初期化 *)
         Node.Nop, expect ";" tokens
     in
@@ -288,13 +288,14 @@ let function_params tokens = match consume ")" tokens with
     | None -> 
         let with_params tokens = 
             let name, tokens = expect_typed_name tokens in
-            Declaration.add Locally name, tokens
+            Declaration.add Locally name;
+			name, tokens
         in
         consume_function_params tokens with_params
 
 let parse tokens =
-    let rec parse_globals top_levels = function
-        | [] -> top_levels, []
+    let rec parse_globals = function
+        | [] -> []
         | tokens ->
             let name, tokens = expect_typed_name tokens in
             match consume "(" tokens with
@@ -303,23 +304,15 @@ let parse tokens =
                 Declaration.locals := [];
                 let params, tokens = function_params tokens in
                 let body, tokens = function_body tokens in
-                let f = Global.Function (name, params, body, !Declaration.locals) in
-                parse_globals (top_levels @ [f]) tokens
+				let locals = !Declaration.locals in
+                Global.Function (name, params, body, locals) :: parse_globals tokens
             | None -> 
                 (* グローバル変数宣言 *)
                 let tokens = expect ";" tokens in
                 (* 宣言に追加 *)
-                let g = Global.Variable (NULL, Declaration.add Globally name) in
-                parse_globals (top_levels @ [g]) tokens
+				Declaration.add Globally name;
+                Global.Variable (NULL, name) :: parse_globals tokens
     in
-    let top_levels, tokens = parse_globals [] tokens in
-    let () = if 0 < List.length tokens then
-            (* 消費されなかったトークンがあれば出力される *)
-            begin
-                printf "# [remains] ";
-                List.iter Lexer.print_token tokens;
-                print_endline ""
-            end
-    in
+    let top_levels = parse_globals tokens in
     Declaration.locals := [];
     !literals @ top_levels

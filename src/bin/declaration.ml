@@ -24,4 +24,4 @@ let add scope declaration =
     | Some _ -> failwith (scope_name ^ " variable " ^ name ^ " is already declared.")
     | None ->
         scope_ref := !scope_ref @ [declaration];
-        declaration
+        ()

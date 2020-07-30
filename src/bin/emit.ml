@@ -185,9 +185,7 @@ let emit func_name node =
             printf			"  mov %s [rdi], %s\n" prefix register_name;
             print_string    "  push rax\n"
         | Node.Int d ->
-            printf  "  push %d\n" d;
-            (* TODO 外せるはずだけど外せない *)
-            printf  "  mov rax, %d\n" d
+            printf  "  push %d\n" d
         | Node.String label ->
             printf	"  mov rax, OFFSET FLAT:%s\n" label;
             printf	"  push rax\n";

@@ -38,8 +38,8 @@ let rec offset_list list sum = function
         offset_list list sum tail
 
 let untyped globals = 
-    let rec convert converted = function 
-        | [] -> converted
+    let rec convert = function 
+        | [] -> []
         | global :: globals -> match global with
             | Global.Function ({ Type.name; _}, params, body, locals) ->
                 let (offset_list, stack) = offset_list [] 0 locals in
@@ -52,13 +52,10 @@ let untyped globals =
                              { name; size; offset }
                         ) params
                 in
-                let f = Global.Function (name, params, body, stack) in
-                convert (converted @ [f]) globals
+                Global.Function (name, params, body, stack) :: convert globals
             | Global.Variable (c_type, { Type.name; _}) -> 
-                let g = Global.Variable (Type.size c_type, name) in
-                convert (converted @ [g]) globals
+                Global.Variable (Type.size c_type, name) :: convert globals
             | Global.String (label, literal) -> 
-				let s = Global.String (label, literal) in
-                convert (converted @ [s]) globals
+                Global.String (label, literal) :: convert globals
     in
-    convert [] globals 
+    convert globals 
