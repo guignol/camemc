@@ -5,9 +5,25 @@
 
 let () =
     let input = Sys.argv.(1) in
-    let reader index = try Some input.[index] with _ -> None in
+    let reader = if input = "-f"
+        then
+            (* ファイル名から読み込む *)
+            let input = Sys.argv.(2) in
+            let channel = open_in input in
+            (fun index -> 
+                 let () = seek_in channel index in
+                 try Some (input_char channel) with End_of_file -> None
+            )
+        else
+            (* 引数から読み込む *)
+            (fun index -> 
+                 try Some input.[index] with _ -> None
+            )
+    in
     Emit.e
         (Untyped.untyped
              (Typed.typed 
                   (Parser.parse
-                       (Lexer.tokenize reader))))
+                       (Lexer.tokenize reader))));
+    (* let _ = reader 1 in *)
+

@@ -69,13 +69,16 @@ let tokenize reader =
         let read_string_literal ch =
             match equals ch (fun _ -> true) "\"" with
             | Some (_, _) -> 
-                (* TODO リテラル内のダブルクォート *)
                 let rec concat_string count buffer =
                     match reader (cursor + count) with
                     | None -> failwith "" (* 末尾 *)
                     | Some ch -> 
                         if ch = '\"' 
                         then count + 1, buffer
+                        else if ch = '\\' (* エスケープ *)
+                        then 
+                            let next = Option.get (reader (cursor + count + 1)) in
+                            concat_string (count + 2) (buffer ^ String.make 1 ch ^ String.make 1 next)
                         else concat_string (count + 1) (buffer ^ String.make 1 ch)
                 in
                 Some (concat_string 1 "")
