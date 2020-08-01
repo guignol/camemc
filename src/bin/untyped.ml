@@ -29,7 +29,7 @@ let untyped_node offset_of_index node =
     convert node
 
 let rec offset_list list sum = function
-    | [] -> (list, sum)
+    | [] -> list, sum
     | head :: tail ->
         let { Type.c_type; _} = head in
         let size = Type.size c_type in
@@ -42,7 +42,7 @@ let untyped globals =
         | [] -> []
         | global :: globals -> match global with
             | Global.Function ({ Type.name; _}, params, body, locals) ->
-                let (offset_list, stack) = offset_list [] 0 locals in
+                let offset_list, stack = offset_list [] 0 locals in
                 let offset_of_index i = List.nth offset_list i in
                 let body = List.map (untyped_node offset_of_index) body in
                 let params = List.mapi

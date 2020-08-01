@@ -125,10 +125,10 @@ let tokenize reader =
     read_input 0 []
 
 let debug_string_of_token = function
-    | Number d -> sprintf "%d(number)" d
-    | Reserved r -> sprintf "%s(reserved)" r
-    | Identifier s -> sprintf "%s(identifier)" s
-    | String s -> sprintf "\"%s\"(string literal)" s
+    | Number d -> sprintf "%d (number)" d
+    | Reserved r -> sprintf "%s (reserved)" r
+    | Identifier s -> sprintf "%s (identifier)" s
+    | String s -> sprintf "\"%s\" (string literal)" s
 
 let print_token t = print_string (debug_string_of_token t)
 

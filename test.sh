@@ -35,11 +35,26 @@ assert() {
 run_test() {
 	filename="$1"
 	mkdir -p ${DIR}
+
 	# コンパイル
 	dune exec camer "--" "-f" "$filename" >${DIR}/tmp.s
+	if [ "$?" = 1 ]; then
+		echo "**********************"
+		echo " error on compile"
+		echo "**********************"
+		exit 1
+	fi
+
 	# リンク
 	gcc -static -o ${DIR}/tmp ${DIR}/tmp.s
 	# gcc -static -o ${DIR}/tmp ${DIR}/tmp.s ${DIR}/foo.s
+	if [ "$?" = 1 ]; then
+		echo "**********************"
+		echo " error on link"
+		echo "**********************"
+		exit 1
+	fi
+
 	# 実行
 	${DIR}/tmp
 	# DIR="_compile"; gcc -static -o ${DIR}/tmp ${DIR}/tmp.s && ${DIR}/tmp; echo $?
@@ -49,6 +64,13 @@ run_test() {
 TEST_CODE="$(pwd)/test.c"
 run_test $TEST_CODE
 # exit $?
+
+if [ "$?" = 1 ]; then
+	echo "**********************"
+	echo " error on test"
+	echo "**********************"
+	exit 1
+fi
 
 #################################################
 
