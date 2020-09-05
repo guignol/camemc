@@ -21,7 +21,7 @@ let rec get_type = function
 
 let is_degit	= function Type.INT | Type.CHAR -> true | _ -> false
 
-let with_type locals globals node =
+let with_type (locals: (Type.typed_name * int) list) globals node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int d -> Node.Int d
@@ -68,9 +68,10 @@ let with_type locals globals node =
                 | _ -> (* TODO Type.BOOL *)
                     Node.Binary (left_t, op, left, right)
             end
-        | Node.Variable (_, name, index, array) ->
-            let { Type.c_type; _ } = List.nth locals index in
-            Node.Variable (c_type, name, index, array)
+        | Node.Variable (_, name, scope, array) ->
+			let find (tn, id) = tn.Type.name = name && scope = id in
+			let { Type.c_type; _ }, _ = List.find find locals in
+            Node.Variable (c_type, name, scope, array)
         | Node.Global (_, name) ->
             (* グローバル変数 *)
             let by_name g = g.Type.name = name in

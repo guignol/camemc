@@ -5,14 +5,14 @@ type parameter = {
     offset: int
 }
 
-let untyped_node offset_of_index node =
+let untyped_node offset_of_name_scoped node =
     let rec convert = function
         | Node.Nop -> Node.Nop
         | Node.Int		num -> Int num
         | Node.String	label -> String label
         | Node.SizeOf	node ->					SizeOf		(convert node)
         | Node.Binary	(c_type, op, l, r) ->	Binary		(Type.size c_type, op, convert l, convert r)
-        | Node.Variable	(c_type, name, i, a) ->	Variable	(Type.size c_type, name, offset_of_index i, a)
+        | Node.Variable	(c_type, name, s, a) ->	Variable	(Type.size c_type, name, offset_of_name_scoped name s, a)
         | Node.Global	(c_type, name) ->		Global		(Type.size c_type, name)
         | Node.Assign	(c_type, l, r) ->		Assign		(Type.size c_type, convert l, convert r)
         | Node.Return	node ->					Return		(convert node)
@@ -28,27 +28,37 @@ let untyped_node offset_of_index node =
     in
     convert node
 
-let rec offset_list list sum = function
-    | [] -> list, sum
+let rec calculate_offsets list offset = function
+    | [] -> list, offset
     | head :: tail ->
-        let { Type.c_type; _} = head in
-        let size = Type.size c_type in
-        let sum = sum + size in
-        let list = list @ [sum] in
-        offset_list list sum tail
+        let { Type.c_type; Type.name}, scope = head in
+        let offset = offset + Type.size c_type in
+        let head = { Type.c_type; Type.name}, scope, offset in
+        calculate_offsets (head :: list) offset tail
 
 let untyped globals = 
     let rec convert = function 
         | [] -> []
         | global :: globals -> match global with
             | Global.Function ({ Type.name; _}, params, body, locals) ->
-                let offset_list, stack = offset_list [] 0 locals in
-                let offset_of_index i = List.nth offset_list i in
-                let body = List.map (untyped_node offset_of_index) body in
-                let params = List.mapi
-                        (fun i { Type.name; Type.c_type; } -> 
+                let locals, stack = calculate_offsets [] 0 locals in
+                let offset_of_name_scoped n s = 
+                    let offset = List.find_map
+                            (fun ({ Type.name; _}, scope, offset) ->
+                                 if n = name && s = scope
+                                 then Some offset
+                                 else None
+                            ) locals
+                    in
+					match offset with 
+					| Some offset -> offset
+					| None -> failwith ("variable " ^ n ^ " is not found")
+                in
+                let body = List.map (untyped_node offset_of_name_scoped) body in
+                let params = List.map
+                        (fun { Type.name; Type.c_type; } -> 
                              let size = Type.size c_type in
-                             let offset = offset_of_index i in
+                             let offset = offset_of_name_scoped name 0 in
                              { name; size; offset }
                         ) params
                 in
@@ -59,3 +69,10 @@ let untyped globals =
                 Global.String (label, literal) :: convert globals
     in
     convert globals 
+
+(* 
+	そのローカルスコープでの名前の重複を防いで、名前と型のペアを保存する
+	この時点ではオフセットが決まらなくてよい
+	横並びのスコープに対してスタックを節約しなくてよい
+	変数の登録とスコープの管理を分ける？
+ *)

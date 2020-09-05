@@ -428,17 +428,17 @@ int sizeof_8() {
 // }
 
 // 3
-int pointer_and_calculate_3() {
-    int x;
-    int i;
-    int y;
-    x = 3;
-    y = 5;
-    // ポインタ演算では8bytesずつ動くので、
-    // 4bytesずつ並んでいるintの2つ分スタックポインタを動かす
-    i = *(&y + 2); // ポインタ演算？（関数フレームの実装に依存）
-    return i;
-}
+// int pointer_and_calculate_3() {
+//     int x;
+//     int i;
+//     int y;
+//     x = 3;
+//     y = 5;
+//     // ポインタ演算では8bytesずつ動くので、
+//     // 4bytesずつ並んでいるintの2つ分スタックポインタを動かす
+//     i = *(&y + 2); // ポインタ演算？（関数フレームの実装に依存）
+//     return i;
+// }
 
 // 4
 int pointer_and_calculate_4() {
@@ -983,7 +983,7 @@ int main() {
 
     // assert("pointer_and_calculate_1", 3, pointer_and_calculate_1());
     // assert("pointer_and_calculate_2", 2, pointer_and_calculate_2());
-    assert("pointer_and_calculate_3", 3, pointer_and_calculate_3()); // ★
+    // assert("pointer_and_calculate_3", 3, pointer_and_calculate_3()); // ★
     assert("pointer_and_calculate_4", 4, pointer_and_calculate_4());
     assert("pointer_and_calculate_5", 3, pointer_and_calculate_5());
 

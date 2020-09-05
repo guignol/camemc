@@ -217,7 +217,7 @@ let rec stmt tokens =
                 consume_array c_type (expect "]" tokens)
         in
         let c_type, tokens = consume_array c_type tokens in
-        Declaration.add Locally { Type.c_type; Type.name };
+        Declaration.add_locally { Type.c_type; Type.name };
         (* TODO 初期化 *)
         Node.Nop, expect ";" tokens
     in
@@ -288,13 +288,13 @@ and primary tokens = match consume "(" tokens with
                 Node.Call (NULL, name, args), tokens
             | None ->
                 (* ローカル変数 *)
-                match Declaration.find Locally name with
-                | Some ({ Type.name; Type.c_type }, i) -> 
-                    Node.Variable (NULL, name, i, Type.is_array c_type), tokens
+                match Declaration.find_locally name with
+                | Some ({ Type.name; Type.c_type }, scope) -> 
+                    Node.Variable (NULL, name, scope, Type.is_array c_type), tokens
                 | None -> 
                     (* グローバル変数 *)
-                    match Declaration.find Globally name with
-                    | Some ({ Type.name; _ }, _) -> 
+                    match Declaration.find_globally name with
+                    | Some { Type.name; _ } -> 
                         Node.Global (NULL, name), tokens
                     | None -> 
                         failwith ("variable " ^ name ^ " is not declared.")
@@ -317,7 +317,7 @@ let function_params tokens = match consume ")" tokens with
     | None -> 
         let with_params tokens = 
             let name, tokens = expect_typed_name tokens in
-            Declaration.add Locally name;
+            Declaration.add_locally name;
             name, tokens
         in
         consume_function_params tokens with_params
@@ -330,18 +330,19 @@ let parse tokens =
             match consume "(" tokens with
             | Some tokens ->
                 (* 関数定義 *)
-                Declaration.locals := [];
+				Declaration.prepare_parameters ();
                 let params, tokens = function_params tokens in
+                Declaration.prepare_locals ();
                 let body, tokens = function_body tokens in
+                (* TODO 最終的にスタックサイズが計算できて、ここの変数サイズを取得できる必要がある *)
                 let locals = !Declaration.locals in
                 Global.Function (name, params, body, locals) :: parse_globals tokens
             | None -> 
                 (* グローバル変数宣言 *)
                 let tokens = expect ";" tokens in
                 (* 宣言に追加 *)
-                Declaration.add Globally name;
+                Declaration.add_globally name;
                 Global.Variable (NULL, name) :: parse_globals tokens
     in
     let top_levels = parse_globals tokens in
-    Declaration.locals := [];
     !literals @ top_levels

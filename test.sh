@@ -64,10 +64,11 @@ run_test() {
 TEST_CODE="$(pwd)/test.c"
 run_test $TEST_CODE
 # exit $?
+result=$?
 
-if [ "$?" = 1 ]; then
+if [ $result != 0 ]; then
 	echo "**********************"
-	echo " error on test"
+	echo " error on test: $result"
 	echo "**********************"
 	exit 1
 fi

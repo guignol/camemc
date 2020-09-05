@@ -8,7 +8,7 @@ type 'meta (* null -> type -> int *) node =
     | String of string
     | SizeOf of		'meta node
     | Binary of		'meta * operation * 'meta node * 'meta node
-    | Variable of	'meta * string * int (* index -> offset *) * bool (* is array *)
+    | Variable of	'meta * string * int (* scope -> offset *) * bool (* is array *)
     | Global of		'meta * string
     | Assign of		'meta * 'meta node * 'meta node
     | Return of		'meta node
