@@ -56,6 +56,41 @@ int assert(char *name, int expected, int actual) {
     }
 }
 
+
+/////////////////////////////////////////////////
+
+// 1
+int scoped_1() {
+    int a_0; // 4
+    int a_1; // 8
+    int a_2; // 12
+    int a_3; // 16
+    a_0 = 33;
+    {
+        int a_0;
+        a_0 = 5; // 20
+        if (a_0 == 5) {
+            return 1;
+        }
+    }
+    return a_0;
+}
+
+// 3
+// int scoped_2() {
+//     int a = 3;
+//     int b = a;
+//     {
+//         bar(a);
+//         int a = b - 2;
+//         bar(a);
+//         if (a == b) {
+//             return a;
+//         }
+//     }
+//     return a;
+// }
+
 /////////////////////////////////////////////////
 
 // char *moji_global = "moji_global_before\n";
@@ -740,63 +775,63 @@ int assert_others() {
         for (i = 0; i < 10; i = i + 1) a = a + 1;
         99;
     }));
-    // assert("", 10, ({
-    //     int a;
-    //     a = 0;
-    //     int i;
-    //     for (i = 0; i < 10; i = i + 1) a = a + 1;
-    //     a;
-    // }));
-    // assert("", 10, ({
-    //     int a;
-    //     a = 0;
-    //     while (a < 10) a = a + 1;
-    //     a;
-    // }));
+    assert("", 10, ({
+        int a;
+        a = 0;
+        int i;
+        for (i = 0; i < 10; i = i + 1) a = a + 1;
+        a;
+    }));
+    assert("", 10, ({
+        int a;
+        a = 0;
+        while (a < 10) a = a + 1;
+        a;
+    }));
 
-    // assert("", 25, ({
-    //     int a_3;
-    //     int _loc;
-    //     a_3 = 12;
-    //     _loc = 3;
-    //     a_3 * _loc - 11;
-    // }));
-    // assert("", 5, ({
-    //     int aaa;
-    //     aaa = 3;
-    //     aaa + 2;
-    // }));
-    // assert("", 5, ({
-    //     int b29;
-    //     int aaa;
-    //     aaa = 3;
-    //     b29 = 2;
-    //     b29 + aaa;
-    // }));
-    // assert("", 5, ({
-    //     int O0;
-    //     O0 = 3;
-    //     O0 = 2;
-    //     O0 + 3;
-    // }));
+    assert("", 25, ({
+        int a_3;
+        int _loc;
+        a_3 = 12;
+        _loc = 3;
+        a_3 * _loc - 11;
+    }));
+    assert("", 5, ({
+        int aaa;
+        aaa = 3;
+        aaa + 2;
+    }));
+    assert("", 5, ({
+        int b29;
+        int aaa;
+        aaa = 3;
+        b29 = 2;
+        b29 + aaa;
+    }));
+    assert("", 5, ({
+        int O0;
+        O0 = 3;
+        O0 = 2;
+        O0 + 3;
+    }));
 
-    // assert("", 5, ({
-    //     int a;
-    //     a = 3;
-    //     a + 2;
-    // }));
-    // assert("", 3, ({
-    //     int a;
-    //     a = 3;
-    //     a;
-    // }));
-    // assert("", 5, ({
-    //     int a;
-    //     int z;
-    //     a = 3;
-    //     z = 2;
-    //     a + z;
-    // }));
+    assert("", 5, ({
+        int a;
+        a = 3;
+        a + 2;
+    }));
+    assert("", 3, ({
+        int a;
+        a = 3;
+        a;
+    }));
+    assert("", 5, ({
+        int a;
+        int z;
+        a = 3;
+        z = 2;
+        a + z;
+    }));
 
     assert("", 0, ({ 0; }));
     assert("", 42, ({ 42; }));
@@ -876,7 +911,7 @@ int main() {
     // assert("scope_for_1", 11, scope_for_1());
     // assert("scope_for_2", 12, scope_for_2());
     // assert("scope_for_3", 45, scope_for_3());
-    // assert("scoped_1", 1, scoped_1());
+    assert("scoped_1", 1, scoped_1());
     // assert("scoped_2", 3, scoped_2());
 
     // assert("loop_1", 9, loop_1());

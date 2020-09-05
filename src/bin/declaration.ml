@@ -41,10 +41,15 @@ let prepare_parameters () =
     current_scope := new_scope NoScope;
     ()
 
-let prepare_locals () = 
-    (* 引数のスコープ、つまり現在のスコープを親にして新しいスコープを作る *)
-    current_scope := new_scope !current_scope;
-    ()
+let prepare_child_scope () = 
+    (* 現在のスコープを親にして新しいスコープを作る *)
+	let parent = !current_scope in
+    current_scope := new_scope parent;
+	parent
+
+let restore_scope scope = 
+	current_scope := scope;
+	()
 
 let find_locally ?(scope = !current_scope) name =
     let rec find_by_scope = function

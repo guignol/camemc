@@ -228,11 +228,18 @@ let rec stmt tokens =
     match consume "{"		tokens with Some tokens -> node_block tokens | None -> 
     match consume_base_type tokens with (Some t, tokens) -> node_v_declaration t tokens | _ ->
         discard_result (end_with ";" expr tokens)
-and consume_block ?(list = []) tokens  = match consume "}" tokens with
-    | Some tokens -> list, tokens
-    | None -> 
-        let statement, tokens = stmt tokens in
-        consume_block ~list:(list @ [statement]) tokens 
+and consume_block tokens = 
+    let scope = Declaration.prepare_child_scope () in
+    let rec f list tokens = match consume "}" tokens with
+        | Some tokens -> list, tokens
+        | None -> 
+            let statement, tokens = stmt tokens in
+            let list = list @ [statement] in
+            f list tokens
+    in 
+    let list, tokens = f [] tokens in
+	Declaration.restore_scope scope;
+    list, tokens
 and expr tokens = assign tokens
 and assign tokens =
     let left, tokens = equality tokens in
@@ -330,11 +337,10 @@ let parse tokens =
             match consume "(" tokens with
             | Some tokens ->
                 (* 関数定義 *)
-				Declaration.prepare_parameters ();
+                Declaration.prepare_parameters ();
                 let params, tokens = function_params tokens in
-                Declaration.prepare_locals ();
+                let _ = Declaration.prepare_child_scope () in
                 let body, tokens = function_body tokens in
-                (* TODO 最終的にスタックサイズが計算できて、ここの変数サイズを取得できる必要がある *)
                 let locals = !Declaration.locals in
                 Global.Function (name, params, body, locals) :: parse_globals tokens
             | None -> 
