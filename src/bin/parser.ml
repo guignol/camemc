@@ -337,9 +337,9 @@ let parse tokens =
             match consume "(" tokens with
             | Some tokens ->
                 (* 関数定義 *)
-                Declaration.prepare_parameters ();
+                Declaration.prepare_function_parameters ();
                 let params, tokens = function_params tokens in
-                let _ = Declaration.prepare_child_scope () in
+                Declaration.prepare_function_body ();
                 let body, tokens = function_body tokens in
                 let locals = !Declaration.locals in
                 Global.Function (name, params, body, locals) :: parse_globals tokens

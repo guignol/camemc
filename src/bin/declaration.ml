@@ -34,13 +34,6 @@ let new_scope parent =
     ___local_scope_count___ := id + 1;
 	Scope (parent, [], id)
 
-let prepare_parameters () = 
-    locals := [];
-	(* 引数のスコープは0固定 *)
-    ___local_scope_count___ := 0;
-    current_scope := new_scope NoScope;
-    ()
-
 let prepare_child_scope () = 
     (* 現在のスコープを親にして新しいスコープを作る *)
 	let parent = !current_scope in
@@ -50,6 +43,15 @@ let prepare_child_scope () =
 let restore_scope scope = 
 	current_scope := scope;
 	()
+
+let prepare_function_parameters () = 
+    locals := [];
+	(* 引数のスコープは0固定 *)
+    ___local_scope_count___ := 0;
+    current_scope := new_scope NoScope;
+    ()
+
+let prepare_function_body () = let _ = prepare_child_scope () in ()
 
 let find_locally ?(scope = !current_scope) name =
     let rec find_by_scope = function
