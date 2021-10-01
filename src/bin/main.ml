@@ -20,10 +20,10 @@ let () =
                  try Some input.[index] with _ -> None
             )
     in
-    Emit.e
-        (Untyped.untyped
-             (Typed.typed 
-                  (Parser.parse
-                       (Lexer.tokenize reader))));
+    Lexer.tokenize reader
+    |> Parser.parse
+    |> Typed.typed
+    |> Untyped.untyped
+    |> Emit.e;
     (* let _ = reader 1 in *)
 
